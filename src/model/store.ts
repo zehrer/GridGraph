@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { addType, emptyGraph, newId, normalize, typesOf } from "./graph";
+import { browserLocale, setLocale } from "./locale";
 import type { Graph } from "./types";
 
 /** A database saved in this browser. */
@@ -18,15 +19,21 @@ export const rangeOf = (a: Cell, b: Cell) => ({
 });
 
 /** Personal display settings, kept per browser (not part of a database). */
-export interface Prefs { minRows: number; minCols: number; graphTypes: boolean }
+/** `notation` is a locale tag for numbers and dates, "" = the browser's. */
+export interface Prefs { minRows: number; minCols: number; graphTypes: boolean; notation: string }
 const PREFS_KEY = "gridgraph.prefs";
-const DEFAULT_PREFS: Prefs = { minRows: 20, minCols: 5, graphTypes: true };
+const DEFAULT_PREFS: Prefs = { minRows: 20, minCols: 5, graphTypes: true, notation: "" };
 function loadPrefs(): Prefs {
   try {
     return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") };
   } catch {
     return DEFAULT_PREFS;
   }
+}
+
+function applyNotation(p: Prefs): Prefs {
+  setLocale(p.notation || browserLocale);
+  return p;
 }
 
 interface State {
@@ -76,9 +83,9 @@ function settle(g: Graph, activeTypeId: string) {
 export const useStore = create<State>()((set, get) => {
   const initial = emptyGraph();
   return {
-    prefs: loadPrefs(),
+    prefs: applyNotation(loadPrefs()),
     setPrefs: (p) => {
-      const prefs = { ...get().prefs, ...p };
+      const prefs = applyNotation({ ...get().prefs, ...p });
       set({ prefs });
       try {
         localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));

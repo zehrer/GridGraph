@@ -220,3 +220,4 @@ main { flex: 1; min-height: 0; display: flex; }
 .graph-legend button:hover { background: var(--hover); }
 .graph-legend i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .graph-legend span { margin-left: auto; padding-left: 12px; color: var(--muted); font-size: 12px; }
+.dialog select { max-width: 210px; padding: 6px 8px; border: 1px solid #747775; border-radius: 4px; background: var(--surface); }

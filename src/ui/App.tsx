@@ -9,6 +9,8 @@ import { Toolbar } from "./Toolbar";
 
 export function App() {
   const view = useStore((s) => s.view);
+  // Remount the sheet when the notation changes: its memoized rows cache formatted values.
+  const notation = useStore((s) => s.prefs.notation);
   const name = useStore((s) => s.db.name);
   useEffect(() => void (document.title = `${name} – GridGraph`), [name]);
 
@@ -32,7 +34,7 @@ export function App() {
     <div className="app">
       <Header />
       <Toolbar />
-      <main>{view === "sheet" ? <Sheet /> : <GraphView />}</main>
+      <main>{view === "sheet" ? <Sheet key={notation} /> : <GraphView />}</main>
       <SheetTabs />
     </div>
   );

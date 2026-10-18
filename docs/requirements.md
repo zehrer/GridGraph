@@ -45,7 +45,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | SH-3 | The first column is the read-only **ID**, fixed on the left; it doubles as the row header (there are no separate row numbers) but selects like any other column. Shift+Space extends the selection to whole rows. Rows are sorted by ID unless the user sorts by a column. | Done |
 | SH-3a | The **name column** is marked (◆, blue header) but can sit anywhere; any column can be made the name column from the column menu. It cannot be deleted. | Done |
 | SH-3b | **Renumber IDs** (Edit menu, or right click on the ID header) gives the rows 1…n again, closing gaps left by deletes, after a confirmation. | Done |
-| SH-3c | **Settings** (View → Settings…): minimum number of rows and columns shown (default 20 and 5); the sheet always shows the data plus one empty row and column. Stored per browser. | Done |
+| SH-3c | **Settings** (View → Settings…): minimum number of rows and columns shown (default 20 and 5), and the **number and date notation** (Browser default, German, English US, English UK). Stored per browser. | Done |
 | SH-4 | Typing into an empty row creates an instance; typing into an empty column creates a property. | Done |
 | SH-5 | Editing: start typing, Enter, F2 or double-click; Enter/Tab confirm and move; Esc cancels; Delete/Backspace clears. | Done |
 | SH-6 | Arrow keys, Tab and Enter move the active cell. | Done |
@@ -75,6 +75,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | FM-4 | Number formats: Automatic, Integer, 2 decimals, Euro, Dollar, Percent (edited as "12.5%", stored as 0.125). The footer uses the column's format. | Done |
 | FM-5 | Choosing a number or date format on a text column converts it, reading the values with the chosen format. | Done |
 | FM-6 | An empty text column (e.g. after typing its heading first) takes the type of the first values typed into it. | Done |
+| FM-7 | A **decimal comma** is understood in every notation ("0,5", "12,99", "1.234,56"); with both marks the last one is the decimal mark, and a single mark only counts as thousands grouping when it groups exactly like that and the notation uses the other mark ("1,234" in English, "1.234" in German). | Done |
 
 ## 4b. Help
 
@@ -150,6 +151,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | 2026-10-18 | The name is a normal column marked as the name column (`nameKey`), not a fixed first column; older data is migrated on load. |
 | 2026-10-18 | No separate row numbers: the ID column is the row header. Display settings (minimum rows/columns) are personal and live in the browser, not in the database. |
 | 2026-10-18 | Columns carry an optional display format (date/number). Dates with dots are day.month.year in every locale, since no locale writes month first with dots. |
+| 2026-10-18 | The notation (decimal mark, date order, currency placement) is a personal setting, defaulting to the browser locale; input accepts a decimal comma regardless. |
 | 2026-10-18 | A pasted table only brings its own header row into an empty sheet when it has several columns with text headings, so a pasted list of names keeps its first entry. |
 
 ## 10. Open questions

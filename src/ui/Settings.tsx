@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../model/store";
+import { NOTATIONS, browserLocale } from "../model/locale";
 
 /** Personal settings of this browser. */
 export function Settings({ onClose }: { onClose: () => void }) {
@@ -20,9 +21,17 @@ export function Settings({ onClose }: { onClose: () => void }) {
           <span>Columns shown at least</span>
           <input type="number" min={0} max={50} value={prefs.minCols} onChange={(e) => setPrefs({ minCols: num(e.target.value, 0, 50) })} />
         </label>
-        <p className="hint">The sheet always shows your data plus one empty row and column to type into. These settings are stored in this browser only.</p>
+        <label>
+          <span>Number and date notation</span>
+          <select value={prefs.notation} onChange={(e) => setPrefs({ notation: e.target.value })}>
+            {NOTATIONS.map(([tag, label]) => (
+              <option key={tag} value={tag}>{tag ? label : `${label} (${browserLocale})`}</option>
+            ))}
+          </select>
+        </label>
+        <p className="hint">A decimal comma is understood in every notation (0,5 · 12,99). The sheet always shows your data plus one empty row and column to type into. These settings are stored in this browser only.</p>
         <footer>
-          <button type="button" onClick={() => setPrefs({ minRows: 20, minCols: 5 })}>Reset</button>
+          <button type="button" onClick={() => setPrefs({ minRows: 20, minCols: 5, notation: "" })}>Reset</button>
           <button className="primary">Done</button>
         </footer>
       </form>

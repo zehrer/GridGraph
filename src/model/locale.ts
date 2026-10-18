@@ -4,7 +4,16 @@
  * to the same locale. Stored values stay locale-free: numbers and ISO dates.
  */
 
-let locale = typeof navigator !== "undefined" ? navigator.language : "en-US";
+export const browserLocale = typeof navigator !== "undefined" ? navigator.language : "en-US";
+let locale = browserLocale;
+
+/** Choices for Settings → Number and date notation ("" follows the browser). */
+export const NOTATIONS = [
+  ["", "Browser default"],
+  ["de-DE", "German – 1.234,56 · 25.11.2026"],
+  ["en-US", "English (US) – 1,234.56 · 11/25/2026"],
+  ["en-GB", "English (UK) – 1,234.56 · 25/11/2026"],
+] as const;
 let decimal = ".";
 let dateOrder: ("day" | "month" | "year")[] = ["month", "day", "year"];
 let dateSep = "/";
@@ -19,11 +28,26 @@ export function setLocale(tag: string) {
 }
 setLocale(locale);
 
+/** True if `t` reads as whole thousands grouped with `sep`, e.g. "1,234" or "12.345.678". */
+const isGrouping = (t: string, sep: string) => new RegExp(`^-?[1-9]\\d{0,2}(\\${sep}\\d{3})+$`).test(t);
+
+/**
+ * Reads a number written with a decimal comma or point, in any locale: "0,5", "12.99", "1.234,56",
+ * "1,234.56". With both marks the last one is the decimal mark. A single kind of mark only counts as
+ * thousands grouping when it groups exactly like that and the locale uses the other mark as decimal,
+ * so "1,234" is 1234 in English and "1.234" is 1234 in German. "12,5 %" means 0.125.
+ */
 export function parseNumber(s: string): number | undefined {
-  // Grouping separators are dropped: "1.234,5" (de) or "1,234.5" (en); "12,5 %" means 0.125.
   const percent = /%\s*$/.test(s);
-  const raw = s.replace(/[%\s€$]/g, "");
-  const t = decimal === "," ? (raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw) : raw.replace(/,/g, "");
+  let t = s.replace(/[%\s€$'’]/g, "");
+  const [comma, dot] = [t.lastIndexOf(","), t.lastIndexOf(".")];
+  let mark: string | undefined;
+  if (comma >= 0 && dot >= 0) mark = comma > dot ? "," : ".";
+  else if (comma >= 0) mark = decimal === "." && isGrouping(t, ",") ? undefined : ",";
+  else if (dot >= 0) mark = decimal === "," && isGrouping(t, ".") ? undefined : ".";
+  const group = mark === "," ? "." : mark === "." ? "," : comma >= 0 ? "," : ".";
+  t = t.split(group).join("");
+  if (mark === ",") t = t.replace(",", ".");
   const n = Number(t);
   return t && Number.isFinite(n) ? (percent ? Number((n / 100).toPrecision(12)) : n) : undefined;
 }

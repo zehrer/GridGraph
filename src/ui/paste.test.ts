@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseClipboard, parseTSV, toTSV } from "../model/clipboard";
 import { displayValue, guessType, normalize } from "../model/graph";
 import { summarize } from "../model/summary";
-import { setLocale } from "../model/locale";
+import { displayNumber, formatNumber, parseNumber, setLocale } from "../model/locale";
 import { emptyGraph } from "../model/graph";
 import { newDbInfo, useStore } from "../model/store";
 import { addRow, commitCell, formatColumns, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
@@ -172,6 +172,21 @@ describe("formats", () => {
     expect(currentSheet().rows[0].props[currentSheet().columns[2].key]).toBe(0.125);
     expect(text(1, 3)).toBe("12.5%");
     expect(displayValue(g(), currentSheet().columns[2], 0.125)).toBe("12.5%");
+  });
+});
+
+describe("decimal comma", () => {
+  it("is understood in an English locale; thousands grouping still works", () => {
+    setLocale("en-US");
+    expect(["0,5", "12,99", "1.234,56", "1,234.56", "1,234", "-0,25", "12,5 %", "€ 3,50"].map(parseNumber)).toEqual([0.5, 12.99, 1234.56, 1234.56, 1234, -0.25, 0.125, 3.5]);
+  });
+
+  it("German notation reads 1.234 as thousands and shows commas", () => {
+    setLocale("de-DE");
+    expect(["0,5", "1.234", "1.234,5", "1.5", "1,234.5"].map(parseNumber)).toEqual([0.5, 1234, 1234.5, 1.5, 1234.5]);
+    expect(displayNumber(1234.5, "EUR")).toBe("1.234,50\u00a0€");
+    expect(formatNumber(0.5)).toBe("0,5");
+    setLocale("en-US");
   });
 });
 
