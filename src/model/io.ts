@@ -25,7 +25,7 @@ function fromParts(nodeList: NodeInput[], edgeList: EdgeInput[]): Graph {
     if (!src || !g.nodes[e.target] || e.kind === "column") return;
     const relation = e.relation ?? "relatesTo";
     if (relation === "typeOf" || e.kind === "typeOf") src.typeId ??= e.target;
-    else if (!Object.values(src.props).includes(e.target)) {
+    else if (!Object.values(src.props).flat().includes(e.target)) {
       const id = e.id ?? `edge_${i}`;
       g.edges[id] = { id, source: e.source, target: e.target, relation };
     }

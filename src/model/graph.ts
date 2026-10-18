@@ -15,9 +15,13 @@ export const typesOf = (g: Graph) => Object.values(g.nodes).filter((n) => n.isTy
 export const instancesOf = (g: Graph, typeId: string) =>
   Object.values(g.nodes).filter((n) => n.typeId === typeId && !n.isType);
 
+/** Node ids held by a link value (one or several). */
+export const linkIds = (v: Value | undefined): string[] => (Array.isArray(v) ? v : typeof v === "string" ? [v] : []);
+
 function inferType(v: Value): ColumnType {
   if (typeof v === "number") return "number";
   if (typeof v === "boolean") return "boolean";
+  if (Array.isArray(v)) return "text";
   return /^\d{4}-\d{2}-\d{2}/.test(v) ? "date" : "text";
 }
 
@@ -52,9 +56,9 @@ export function edgesOf(g: Graph): DerivedEdge[] {
     if (!n.typeId || !g.nodes[n.typeId]) continue;
     out.push({ id: `${n.id}:typeOf`, source: n.id, target: n.typeId, relation: "typeOf", kind: "typeOf" });
     for (const col of g.nodes[n.typeId].columns ?? []) {
-      const target = n.props[col.key];
-      if (col.type === "relation" && typeof target === "string" && g.nodes[target]) {
-        out.push({ id: `${n.id}:${col.key}`, source: n.id, target, relation: col.label, kind: "column", colKey: col.key });
+      if (col.type !== "relation") continue;
+      for (const target of linkIds(n.props[col.key])) {
+        if (g.nodes[target]) out.push({ id: `${n.id}:${col.key}:${target}`, source: n.id, target, relation: col.label, kind: "column", colKey: col.key });
       }
     }
   }
@@ -96,7 +100,7 @@ export function renumber(g: Graph, typeId: string) {
 export function setProp(g: Graph, nodeId: string, key: string, value: Value | undefined) {
   const n = g.nodes[nodeId];
   if (!n) return;
-  if (value === undefined || value === "") delete n.props[key];
+  if (value === undefined || value === "" || (Array.isArray(value) && !value.length)) delete n.props[key];
   else n.props[key] = value;
 }
 
@@ -141,10 +145,16 @@ export function deleteNode(g: Graph, id: string) {
     if (doomed.has(e.source) || doomed.has(e.target)) delete g.edges[eid];
   }
   for (const n of Object.values(g.nodes)) {
-    for (const [k, v] of Object.entries(n.props)) if (typeof v === "string" && doomed.has(v)) delete n.props[k];
+    for (const [k, v] of Object.entries(n.props)) {
+      if (typeof v === "string" && doomed.has(v)) delete n.props[k];
+      else if (Array.isArray(v) && v.some((id) => doomed.has(id))) setProp(g, n.id, k, toLink(v.filter((id) => !doomed.has(id))));
+    }
     if (n.columns) n.columns = n.columns.map((c) => (c.targetTypeId && doomed.has(c.targetTypeId) ? { ...c, type: "text", targetTypeId: undefined } : c));
   }
 }
+
+/** Stores links as a single id when there is one, as an array when there are several. */
+const toLink = (ids: string[]): Value | undefined => (ids.length > 1 ? ids : ids[0]);
 
 export function addEdge(g: Graph, source: string, target: string, relation: string) {
   const id = newId("edge");
@@ -153,7 +163,10 @@ export function addEdge(g: Graph, source: string, target: string, relation: stri
 
 export function deleteEdge(g: Graph, e: DerivedEdge) {
   if (e.kind === "free") delete g.edges[e.id];
-  else if (e.kind === "column" && e.colKey) setProp(g, e.source, e.colKey, undefined);
+  else if (e.kind === "column" && e.colKey) {
+    const ids = linkIds(g.nodes[e.source]?.props[e.colKey]).filter((id) => id !== e.target);
+    setProp(g, e.source, e.colKey, toLink(ids));
+  }
 }
 
 /**
@@ -199,9 +212,12 @@ export function parseValue(g: Graph, col: Column, raw: string): Value | undefine
     case "date":
       return parseDate(s, col.format) ?? s;
     case "relation": {
-      if (!col.targetTypeId || !g.nodes[col.targetTypeId]) return s;
-      const hit = instancesOf(g, col.targetTypeId).find((n) => nodeName(g, n).toLowerCase() === s.toLowerCase());
-      return hit?.id ?? addInstance(g, col.targetTypeId, s);
+      const target = col.targetTypeId;
+      if (!target || !g.nodes[target]) return s;
+      const find = (name: string) => instancesOf(g, target).find((n) => nodeName(g, n).toLowerCase() === name.toLowerCase())?.id;
+      // Several names are separated by commas, unless the whole text is one existing name ("Acme, Inc.").
+      const names = find(s) ? [s] : s.split(",").map((x) => x.trim()).filter(Boolean);
+      return toLink([...new Set(names.map((name) => find(name) ?? addInstance(g, target, name)))]);
     }
     default:
       return s;
@@ -224,7 +240,7 @@ export function guessType(values: string[]): ColumnType {
  */
 export function rawValue(g: Graph, col: Column, v: Value | undefined): string {
   if (v === undefined) return "";
-  if (col.type === "relation" && typeof v === "string") return g.nodes[v] ? nodeName(g, g.nodes[v]) : v;
+  if (col.type === "relation") return linkIds(v).map((id) => (g.nodes[id] ? nodeName(g, g.nodes[id]) : id)).join(", ");
   if (col.type === "boolean") return formatBoolean(!!v);
   if (col.type === "number" && typeof v === "number") return col.format === "percent" ? formatPercent(v) : formatNumber(v);
   if (col.type === "date" && typeof v === "string") return formatDate(v, col.format);

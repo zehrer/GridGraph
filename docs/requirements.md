@@ -28,7 +28,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | DM-3 | An **instance** is a node whose `typeId` points to its type. The `typeOf` edge is derived from `typeId`, not stored. | Done |
 | DM-4 | Instances hold properties as key → value (text, number, ISO date, boolean, node id). | Done |
 | DM-5 | Column data types: Text, Number, Date, Yes/No, **Link to type** (relation). | Done |
-| DM-6 | A relation property stores the id of the target node; the edge (labelled with the column name) is derived from it. | Done |
+| DM-6 | A link property stores the id of the target node, or an array of ids for **several targets**; one edge per target (labelled with the column name) is derived from it. | Done |
 | DM-7 | **Free edges** (any node → any node, with a relation name) are stored separately. | Done |
 | DM-8 | Properties that no column declares appear as extra columns, with a data type inferred from the value. | Done |
 | DM-9 | Deleting a type deletes its instances; references to deleted nodes are removed; relation columns pointing to a deleted type become text. | Done |
@@ -51,8 +51,8 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | SH-6 | Arrow keys, Tab and Enter move the active cell. | Done |
 | SH-7 | **Range selection** with mouse drag, Shift+click and Shift+arrows. | Done |
 | SH-8 | **Formula bar** shows the active cell (column name + row) and its raw value, and can edit it. | Done |
-| SH-9 | Relation cells: typing a name links to the matching instance of the target type or creates it; suggestions are offered while typing. | Done |
-| SH-9a | **Double-clicking a link cell opens its target**: the target type's sheet with the linked row selected. A "← Type" button in the toolbar (or ⌘[) returns to where the link was opened. Enter, F2 or typing still edit the link cell. | Done |
+| SH-9 | Link cells: typing a name links to the matching instance of the target type or creates it; **several names separated by commas** link several (a whole text that matches an existing name, e.g. "Acme, Inc.", stays one link); suggestions are offered while typing. | Done |
+| SH-9a | **Double-clicking a link opens its target** (the clicked chip when a cell holds several): the target type's sheet with the linked row selected. A "← Type" button in the toolbar (or ⌘[) returns to where the link was opened. Enter, F2 or typing still edit the link cell. | Done |
 | SH-10 | Yes/No cells show a checkbox that toggles on click. | Done |
 | SH-11 | Toolbar: undo, redo, column data type, sort ascending/descending by the active column, search filter, Table/Graph switch. | Done |
 | SH-12 | Changing a column's data type converts existing values (relations by name). | Done |

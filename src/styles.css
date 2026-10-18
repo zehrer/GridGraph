@@ -227,3 +227,5 @@ main { flex: 1; min-height: 0; display: flex; }
 .selection-stats .menu { left: auto; right: 0; }
 .toolbar > button.back { background: var(--accent-soft); color: #041e49; border-radius: 14px; padding: 4px 12px; white-space: nowrap; }
 .chip { cursor: pointer; }
+.chip + .chip { margin-left: 4px; }
+.grid td.wrap .chip { margin: 1px 4px 1px 0; }

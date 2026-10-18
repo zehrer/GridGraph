@@ -27,7 +27,7 @@ describe("graph model", () => {
 
   it("deleting a relation edge clears the property", () => {
     const g = sampleGraph();
-    deleteEdge(g, edgesOf(g).find((e) => e.id === "proj_alpha:lead")!);
+    deleteEdge(g, edgesOf(g).find((e) => e.id === "proj_alpha:lead:person_alice")!);
     expect(g.nodes.proj_alpha.props.lead).toBeUndefined();
   });
 
@@ -53,6 +53,28 @@ describe("graph model", () => {
     expect(parseValue(g, rel, "acme")).toBe(acme);
     const created = parseValue(g, rel, "Neu GmbH") as string;
     expect(g.nodes[created]).toMatchObject({ props: { name: "Neu GmbH" }, typeId: t, no: 2 });
+  });
+
+  it("a link cell can hold several targets, separated by commas", () => {
+    const g = sampleGraph();
+    const lead = g.nodes.type_project.columns!.find((c) => c.key === "lead")!;
+    g.nodes.proj_alpha.props.lead = parseValue(g, lead, "Alice Schmidt, Bob Meier, Dana New")!;
+    const ids = g.nodes.proj_alpha.props.lead as string[];
+    expect(ids.slice(0, 2)).toEqual(["person_alice", "person_bob"]);
+    expect(g.nodes[ids[2]].props.name).toBe("Dana New");
+    expect(rawValue(g, lead, ids)).toBe("Alice Schmidt, Bob Meier, Dana New");
+    expect(edgesOf(g).filter((e) => e.source === "proj_alpha" && e.colKey === "lead").map((e) => e.target)).toEqual(ids);
+    // Removing one edge or deleting one person keeps the other links.
+    deleteEdge(g, edgesOf(g).find((e) => e.id === "proj_alpha:lead:person_bob")!);
+    deleteNode(g, ids[2]);
+    expect(g.nodes.proj_alpha.props.lead).toBe("person_alice");
+  });
+
+  it("a name with a comma stays one link when it exists", () => {
+    const g = sampleGraph();
+    g.nodes.comp_acme.props.name = "Acme, Inc.";
+    const client = g.nodes.type_project.columns!.find((c) => c.key === "client")!;
+    expect(parseValue(g, client, "acme, inc.")).toBe("comp_acme");
   });
 
   it("upsertColumn renames in place", () => {

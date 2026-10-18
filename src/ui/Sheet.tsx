@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import { rangeOf, useStore, type Cell } from "../model/store";
-import { displayValue, nodeColor, nodeName } from "../model/graph";
+import { displayValue, linkIds, nodeColor, nodeName } from "../model/graph";
 import { parseClipboard, toHTML, toTSV } from "../model/clipboard";
 import { SUMMARIES, summarize } from "../model/summary";
 import type { Column, Graph, GraphNode } from "../model/types";
@@ -62,10 +62,12 @@ export function Sheet() {
     const { m, graph } = latest.current;
     const { select } = useStore.getState();
     if (e.type === "dblclick") {
-      // Double-clicking a link opens its target; Enter, F2 or typing still edit the cell.
+      // Double-clicking a link opens its target (the clicked one, if there are several); Enter, F2 or typing still edit the cell.
       const column = m.columns[cell.col - 1];
-      const target = column?.type === "relation" && cell.row > 0 ? m.rows[cell.row - 1]?.props[column.key] : undefined;
-      if (typeof target === "string" && graph.nodes[target]) return A.followLink(target);
+      const targets = column?.type === "relation" && cell.row > 0 ? linkIds(m.rows[cell.row - 1]?.props[column.key]).filter((id) => graph.nodes[id]) : [];
+      const clicked = (e.target as HTMLElement).closest<HTMLElement>("[data-node]")?.dataset.node;
+      const target = clicked ?? (targets.length === 1 ? targets[0] : undefined);
+      if (target) return A.followLink(target);
       return !A.readOnly(cell) && setEdit({ cell, text: A.cellText(graph, m, cell) });
     }
     if (e.type === "mouseenter") return dragging.current && select(cell, true);
@@ -441,12 +443,16 @@ function CellContent({ col, node, column, graph }: { col: number; node?: GraphNo
   const v = column && node.props[column.key];
   if (!column || v === undefined) return null;
   if (column.type === "boolean") return <input type="checkbox" checked={!!v} readOnly tabIndex={-1} />;
-  if (column.type === "relation" && typeof v === "string" && graph.nodes[v]) {
+  if (column.type === "relation") {
     return (
-      <span className="chip" title="Double-click to open">
-        <i style={{ background: nodeColor(graph, graph.nodes[v]) }} />
-        {nodeName(graph, graph.nodes[v])}
-      </span>
+      <>
+        {linkIds(v).filter((id) => graph.nodes[id]).map((id) => (
+          <span key={id} className="chip" data-node={id} title="Double-click to open">
+            <i style={{ background: nodeColor(graph, graph.nodes[id]) }} />
+            {nodeName(graph, graph.nodes[id])}
+          </span>
+        ))}
+      </>
     );
   }
   return <>{displayValue(graph, column, v)}</>;

@@ -12,7 +12,7 @@ Live: https://zehrer.github.io/GridGraph/
 - **Rows = instances**: every row is a node connected to its type by a `typeOf` edge. Each row gets a running **ID** (first column, never reused).
 - **Name column**: one column per type (marked ◆) names the rows in links and in the graph; any column can take that role.
 - **Header row = properties**: typing a name into the header row creates a column. Instances may have extra properties; they show up as columns automatically.
-- **Data types** (toolbar → column type): Text, Number, Date, Yes/No and *Link to type*. A link cell creates a graph edge; typing an unknown name creates the target instance.
+- **Data types** (toolbar → column type): Text, Number, Date, Yes/No and *Link to type*. A link cell creates graph edges and can hold several targets separated by commas; typing an unknown name creates the target instance.
 - Free edges are drawn in the graph view with **Shift + drag**.
 
 ## Usage
