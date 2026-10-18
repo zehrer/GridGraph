@@ -44,7 +44,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | SH-2 | The **header row** (sticky) shows the property names; there are no A/B/C column letters. Typing a name into an empty header cell creates a column. | Done |
 | SH-3 | The first column is the read-only **ID**, fixed on the left; it doubles as the row header (there are no separate row numbers) but selects like any other column. Shift+Space extends the selection to whole rows. Rows are sorted by ID unless the user sorts by a column. | Done |
 | SH-3a | The **name column** is marked (◆, blue header) but can sit anywhere; any column can be made the name column from the column menu. It cannot be deleted. | Done |
-| SH-3b | **Renumber IDs** (Edit menu, or right click on the ID header) gives the rows 1…n again, closing gaps left by deletes, after a confirmation. | Done |
+| SH-3b | **Renumber IDs** (Data menu, or right click on the ID header) gives the rows 1…n again, closing gaps left by deletes, after a confirmation. | Done |
 | SH-3c | **Settings** (View → Settings…): minimum number of rows and columns shown (default 20 and 5), and the **number and date notation** (Browser default, German, English US, English UK). Stored per browser. | Done |
 | SH-4 | Typing into an empty row creates an instance; typing into an empty column creates a property. | Done |
 | SH-5 | Editing: start typing, Enter, F2 or double-click; Enter/Tab confirm and move; Esc cancels; Delete/Backspace clears. | Done |
@@ -64,6 +64,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | SH-19 | **Footer row** (sticky): row count under the ID; per column a choice of None, Sum, Average, Min, Max, Count, Empty (Min/Max also for dates; numbers stored as text are counted too). | Done |
 | SH-20 | Context menu (right click) on cells and row numbers: add/delete rows, cut, copy, paste. | Done |
 | SH-22 | **Status bar figure** (bottom right, like Google Sheets): for a selection of two or more cells shows the Sum of its numbers; a click lists Sum, Average, Min, Max, Count, Count numbers and keeps the chosen one (per browser). Without numbers it shows Count. IDs are not counted. | Done |
+| SH-23 | **Menu bar** order: File, Edit, View, Insert, Format, Data, Help. **Data**: sort A→Z / Z→A by the selected column, sort by ID, Filter… (⌘F, focuses the filter field), filter by selected value, clear filter, Renumber IDs. **View**: Table/Graph, Summary row on/off (per browser), show hidden columns, Settings. | Done |
 | SH-21 | Reorder rows by drag and drop (manual order instead of ID order). | Idea |
 
 ## 4a. Format menu

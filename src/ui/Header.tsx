@@ -52,6 +52,9 @@ export function Header() {
   const hasRow = Math.max(sel.row, s.anchor.row) >= 1 && Math.min(sel.row, s.anchor.row) - 1 < m.rows.length;
   const hasCol = sel.col >= 1 && sel.col <= m.columns.length && m.columns[sel.col - 1].key !== m.type.nameKey;
   const hiddenCount = m.all.filter((c) => c.hidden).length;
+  const sheet = s.view === "sheet";
+  const colSelected = sel.col === 0 || !!m.columns[sel.col - 1];
+  const cellValue = sel.row >= 1 ? A.cellText(s.graph, m, sel) : "";
 
   const menus: { label: string; items: MenuItem[] }[] = [
     {
@@ -67,7 +70,7 @@ export function Header() {
         ...(s.dbs.length ? [{ heading: "Saved in this browser" }] : []),
         ...s.dbs.map((d) => ({
           label: `${d.id === s.db.id ? "✓ " : "\u2003"}${d.name}`,
-          shortcut: new Date(d.updatedAt).toLocaleDateString("de-DE"),
+          shortcut: new Date(d.updatedAt).toLocaleDateString(),
           action: () => openDatabase(d.id),
         })),
         ...(s.dbs.length ? ["-" as const] : []),
@@ -85,8 +88,19 @@ export function Header() {
         { label: "Paste", shortcut: `${MOD}V`, action: A.pasteFromClipboard },
         "-",
         { label: "Delete row(s)", disabled: !hasRow, action: A.deleteRows },
-        { label: "Renumber IDs…", disabled: !m.rows.length, action: A.renumberIds },
         { label: "Delete column", disabled: !hasCol, action: () => A.deleteColumn(sel.col) },
+      ],
+    },
+    {
+      label: "View",
+      items: [
+        { label: `${sheet ? "✓ " : "\u2003"}Table`, action: () => s.setView("sheet") },
+        { label: `${sheet ? "\u2003" : "✓ "}Graph`, action: () => s.setView("graph", m.rows[sel.row - 1]?.id ?? null) },
+        "-",
+        { label: `${s.prefs.summaryRow ? "✓ " : "\u2003"}Summary row`, action: () => s.setPrefs({ summaryRow: !s.prefs.summaryRow }) },
+        { label: hiddenCount ? `Show ${hiddenCount} hidden column${hiddenCount > 1 ? "s" : ""}` : "No hidden columns", disabled: !hiddenCount, action: () => A.unhideColumns() },
+        "-",
+        { label: "Settings…", action: () => setSettings(true) },
       ],
     },
     {
@@ -102,14 +116,18 @@ export function Header() {
       items: formatItems(),
     },
     {
-      label: "View",
+      label: "Data",
       items: [
-        { label: "Table", action: () => s.setView("sheet") },
-        { label: "Graph", action: () => s.setView("graph", m.rows[sel.row - 1]?.id ?? null) },
+        { heading: sel.col >= 1 && m.columns[sel.col - 1] ? `Column "${m.columns[sel.col - 1].label}"` : sel.col === 0 ? "Column ID" : "Select a column" },
+        { label: "Sort A → Z", disabled: !sheet || !colSelected, action: () => A.sortBy(sel.col, true) },
+        { label: "Sort Z → A", disabled: !sheet || !colSelected, action: () => A.sortBy(sel.col, false) },
+        { label: "Sort by ID", disabled: !sheet, action: () => useStore.setState({ sort: null }) },
         "-",
-        { label: hiddenCount ? `Show ${hiddenCount} hidden column${hiddenCount > 1 ? "s" : ""}` : "No hidden columns", disabled: !hiddenCount, action: () => A.unhideColumns() },
+        { label: "Filter…", shortcut: `${MOD}F`, disabled: !sheet, action: A.focusFilter },
+        { label: "Filter by selected value", disabled: !sheet || !cellValue, action: () => useStore.setState({ filter: cellValue }) },
+        { label: "Clear filter", disabled: !s.filter, action: () => useStore.setState({ filter: "" }) },
         "-",
-        { label: "Settings…", action: () => setSettings(true) },
+        { label: "Renumber IDs…", disabled: !m.rows.length, action: A.renumberIds },
       ],
     },
     {

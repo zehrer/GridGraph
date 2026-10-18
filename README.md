@@ -24,11 +24,12 @@ Live: https://zehrer.github.io/GridGraph/
 | Select a range | Drag, Shift + click, Shift + arrow keys |
 | Copy / cut / paste | ⌘C / ⌘X / ⌘V – works with Numbers, Google Sheets and Excel |
 | Columns | ▾ on a header: sort, move, wrap, hide, delete; drag a header to move it, drag its border to resize |
-| Rows | ＋ Row / − Row in the toolbar or right click; Shift+Space selects whole rows; Edit → Renumber IDs closes gaps |
-| Footer | Click below a column to show Sum, Average, Min, Max, Count or Empty |
+| Rows | ＋ Row / − Row in the toolbar or right click; Shift+Space selects whole rows; Data → Renumber IDs closes gaps |
+| Summary row | Click below a column to show Sum, Average, Min, Max, Count or Empty; View → Summary row hides it |
 | Status bar | Select cells: bottom right shows their Sum; click it for Average, Min, Max, Count |
 | Format | Format menu: data type, number format (€, $, %, decimals) and date format (e.g. DD.MM.YYYY) of the selected columns |
 | Settings | View → Settings: rows/columns shown at least; number and date notation (e.g. German 1.234,56 · 25.11.2026) |
+| Sort / filter | Data menu; ⌘F filters rows |
 | Undo / redo | ⌘Z / ⇧⌘Z |
 | Graph | Drag = move node or view, wheel = zoom, double-click = open in table |
 

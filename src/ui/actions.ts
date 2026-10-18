@@ -201,6 +201,12 @@ export function deleteRows() {
   select({ row: Math.max(r0, 1), col: sel.col });
 }
 
+/** Data → Filter…: puts the cursor into the toolbar's search field. */
+export function focusFilter() {
+  useStore.getState().setView("sheet");
+  setTimeout(() => (document.getElementById("sheet-filter") as HTMLInputElement | null)?.select());
+}
+
 export function renumberIds() {
   const { graph, activeTypeId, edit } = useStore.getState();
   const n = instancesOf(graph, activeTypeId).length;

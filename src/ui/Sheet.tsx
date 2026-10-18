@@ -356,12 +356,14 @@ export function Sheet() {
               <Row key={i + 1} {...rowProps(i + 1)} />
             ))}
           </tbody>
+          {prefs.summaryRow && (
           <tfoot>
             <tr>
               <td className="id" title="Rows">{m.rows.length}</td>
               {Array.from({ length: nCols - 1 }, (_, i) => footerCell(i + 1))}
             </tr>
           </tfoot>
+          )}
         </table>
         <div className="add-rows">
           <button onClick={() => setExtraRows(extraRows + (parseInt(addCount) || 0))}>Add</button>

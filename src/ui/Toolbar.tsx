@@ -48,7 +48,7 @@ export function Toolbar() {
       <button title="Sort descending" disabled={!sheet} onClick={() => sortBy(s.sel.col, false)}>Z→A</button>
       {s.sort && <button title="Clear sorting" onClick={() => useStore.setState({ sort: null })}>✕</button>}
       <span className="sep" />
-      <input className="search" placeholder="Search" value={s.filter} disabled={!sheet} onChange={(e) => useStore.setState({ filter: e.target.value })} />
+      <input id="sheet-filter" className="search" placeholder="Filter rows" value={s.filter} disabled={!sheet} onChange={(e) => useStore.setState({ filter: e.target.value })} />
       <div className="spacer" />
       <div className="segmented">
         <button className={sheet ? "on" : ""} onClick={() => s.setView("sheet")}>Table</button>
