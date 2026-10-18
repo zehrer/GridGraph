@@ -225,3 +225,5 @@ main { flex: 1; min-height: 0; display: flex; }
 .selection-stats > button { border: 1px solid var(--line); background: var(--surface); border-radius: 4px; padding: 4px 10px; font-size: 13px; color: var(--text); }
 .selection-stats > button:hover { background: var(--hover); }
 .selection-stats .menu { left: auto; right: 0; }
+.toolbar > button.back { background: var(--accent-soft); color: #041e49; border-radius: 14px; padding: 4px 12px; white-space: nowrap; }
+.chip { cursor: pointer; }

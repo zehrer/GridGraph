@@ -322,6 +322,22 @@ export function showInSheet(nodeId: string) {
   s.select({ row: m.rows.findIndex((r) => r.id === nodeId) + 1, col: nameCol || 1 });
 }
 
+/** Follows a link cell to its target row, remembering where to come back to. */
+export function followLink(targetId: string) {
+  const { activeTypeId, sel, graph } = useStore.getState();
+  if (!graph.nodes[targetId]) return;
+  showInSheet(targetId);
+  useStore.setState({ back: { typeId: activeTypeId, sel } });
+}
+
+export function goBack() {
+  const { back, graph, setActiveType, select } = useStore.getState();
+  if (!back || !graph.nodes[back.typeId]) return useStore.setState({ back: null });
+  setActiveType(back.typeId);
+  useStore.setState({ back: null, view: "sheet" });
+  select(back.sel);
+}
+
 export const nameOf = (id: string) => {
   const g = useStore.getState().graph;
   return g.nodes[id] ? nodeName(g, g.nodes[id]) : "";

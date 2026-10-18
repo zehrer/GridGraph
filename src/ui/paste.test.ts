@@ -5,7 +5,8 @@ import { selectionStats, summarize } from "../model/summary";
 import { displayNumber, formatNumber, parseNumber, setLocale } from "../model/locale";
 import { emptyGraph } from "../model/graph";
 import { newDbInfo, useStore } from "../model/store";
-import { addRow, selectionValues, commitCell, formatColumns, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
+import { sampleGraph } from "../model/sample";
+import { addRow, followLink, goBack, selectionValues, commitCell, formatColumns, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
 
 beforeEach(() => setLocale("en-US"));
 
@@ -202,6 +203,20 @@ describe("selection statistics", () => {
     const stats = selectionStats(values);
     expect(stats).toMatchObject({ sum: 20.14, min: 0.15, max: 12.99, count: 7, countNumbers: 3 });
     expect(stats.avg).toBeCloseTo(6.7133, 4);
+  });
+});
+
+describe("following links", () => {
+  it("opens the linked row and comes back", () => {
+    useStore.getState().open(sampleGraph(), newDbInfo());
+    useStore.getState().setActiveType("type_project");
+    useStore.getState().select({ row: 1, col: 5 });
+    followLink("person_alice");
+    const s = useStore.getState();
+    expect(s.activeTypeId).toBe("type_person");
+    expect(currentSheet().rows[s.sel.row - 1].id).toBe("person_alice");
+    goBack();
+    expect(useStore.getState()).toMatchObject({ activeTypeId: "type_project", sel: { row: 1, col: 5 }, back: null });
   });
 });
 

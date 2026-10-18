@@ -52,6 +52,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | SH-7 | **Range selection** with mouse drag, Shift+click and Shift+arrows. | Done |
 | SH-8 | **Formula bar** shows the active cell (column name + row) and its raw value, and can edit it. | Done |
 | SH-9 | Relation cells: typing a name links to the matching instance of the target type or creates it; suggestions are offered while typing. | Done |
+| SH-9a | **Double-clicking a link cell opens its target**: the target type's sheet with the linked row selected. A "← Type" button in the toolbar (or ⌘[) returns to where the link was opened. Enter, F2 or typing still edit the link cell. | Done |
 | SH-10 | Yes/No cells show a checkbox that toggles on click. | Done |
 | SH-11 | Toolbar: undo, redo, column data type, sort ascending/descending by the active column, search filter, Table/Graph switch. | Done |
 | SH-12 | Changing a column's data type converts existing values (relations by name). | Done |

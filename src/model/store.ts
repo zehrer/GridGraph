@@ -54,6 +54,8 @@ interface State {
   sel: Cell;
   anchor: Cell;
   focusNodeId: string | null;
+  /** Where "Back" returns to after following a link. */
+  back: { typeId: string; sel: Cell } | null;
   /** Sheet view options; key "" sorts by name. */
   sort: { key: string; asc: boolean } | null;
   filter: string;
@@ -105,6 +107,7 @@ export const useStore = create<State>()((set, get) => {
     sel: { row: 1, col: 0 },
     anchor: { row: 1, col: 0 },
     focusNodeId: null,
+    back: null,
     sort: null,
     filter: "",
     savedAt: null,

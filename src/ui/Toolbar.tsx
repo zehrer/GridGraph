@@ -1,6 +1,6 @@
 import { useStore } from "../model/store";
 import { typesOf } from "../model/graph";
-import { addRow, currentSheet, deleteRows, setColumnType, sortBy } from "./actions";
+import { addRow, currentSheet, deleteRows, goBack, setColumnType, sortBy } from "./actions";
 
 const TYPES = [
   ["text", "Text"],
@@ -17,6 +17,12 @@ export function Toolbar() {
 
   return (
     <div className="toolbar">
+      {s.back && s.graph.nodes[s.back.typeId] && (
+        <>
+          <button className="back" title="Back to where the link was opened" onClick={goBack}>← {s.graph.nodes[s.back.typeId].label}</button>
+          <span className="sep" />
+        </>
+      )}
       <button title="Undo" disabled={!s.past.length} onClick={s.undo}>↶</button>
       <button title="Redo" disabled={!s.future.length} onClick={s.redo}>↷</button>
       <span className="sep" />

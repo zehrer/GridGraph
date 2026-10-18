@@ -61,7 +61,13 @@ export function Sheet() {
   const onCell = useRef<CellHandler>((e, cell) => {
     const { m, graph } = latest.current;
     const { select } = useStore.getState();
-    if (e.type === "dblclick") return !A.readOnly(cell) && setEdit({ cell, text: A.cellText(graph, m, cell) });
+    if (e.type === "dblclick") {
+      // Double-clicking a link opens its target; Enter, F2 or typing still edit the cell.
+      const column = m.columns[cell.col - 1];
+      const target = column?.type === "relation" && cell.row > 0 ? m.rows[cell.row - 1]?.props[column.key] : undefined;
+      if (typeof target === "string" && graph.nodes[target]) return A.followLink(target);
+      return !A.readOnly(cell) && setEdit({ cell, text: A.cellText(graph, m, cell) });
+    }
     if (e.type === "mouseenter") return dragging.current && select(cell, true);
     if (e.button !== 0) return;
     dragging.current = true;
@@ -436,7 +442,12 @@ function CellContent({ col, node, column, graph }: { col: number; node?: GraphNo
   if (!column || v === undefined) return null;
   if (column.type === "boolean") return <input type="checkbox" checked={!!v} readOnly tabIndex={-1} />;
   if (column.type === "relation" && typeof v === "string" && graph.nodes[v]) {
-    return <span className="chip"><i style={{ background: nodeColor(graph, graph.nodes[v]) }} />{nodeName(graph, graph.nodes[v])}</span>;
+    return (
+      <span className="chip" title="Double-click to open">
+        <i style={{ background: nodeColor(graph, graph.nodes[v]) }} />
+        {nodeName(graph, graph.nodes[v])}
+      </span>
+    );
   }
   return <>{displayValue(graph, column, v)}</>;
 }

@@ -20,6 +20,7 @@ Live: https://zehrer.github.io/GridGraph/
 | | |
 |---|---|
 | Edit a cell | Start typing, Enter, F2 or double-click |
+| Follow a link | Double-click a link cell to open the linked row; “← Back” (or ⌘[) returns |
 | Confirm / cancel | Enter, Tab / Esc |
 | Select a range | Drag, Shift + click, Shift + arrow keys |
 | Copy / cut / paste | ⌘C / ⌘X / ⌘V – works with Numbers, Google Sheets and Excel |
