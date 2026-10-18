@@ -1,34 +1,37 @@
 # GridGraph
 
-**GridGraph** ist eine lokale, schemalose Graph-Datenbank mit einer Tabellen-Oberfläche im Stil einer Tabellenkalkulation und einer interaktiven Graph-Ansicht.
+**GridGraph** is a local, schemaless graph database with a spreadsheet-style table and an interactive graph view.
 
-Die App läuft komplett im Browser – ohne Server. Daten werden automatisch in IndexedDB gespeichert.
+It runs entirely in the browser, with no server. Databases are saved automatically in the browser (IndexedDB).
 
 Live: https://zehrer.github.io/GridGraph/
 
-## Konzept
+## Concept
 
-- **Typen = Blätter**: Jeder Typ (z. B. `Person`, `Unternehmen`) ist ein Basis-Knoten im Graph und erscheint unten als Blatt-Tab.
-- **Zeilen = Instanzen**: Jede Zeile ist ein Knoten, der per `typeOf`-Kante mit seinem Typ verbunden ist.
-- **Zeile 1 = Eigenschaften**: Ein Name in der Kopfzeile legt eine Spalte (Property) an. Instanzen dürfen zusätzliche Properties haben; sie erscheinen automatisch als Spalte.
-- **Datentypen** (Toolbar → Spaltentyp): Text, Zahl, Datum, Ja/Nein und *Verknüpfung zu Typ*. Eine Verknüpfungs-Zelle erzeugt eine Graph-Kante; ein unbekannter Name legt die Ziel-Instanz automatisch an.
-- `typeOf`- und Verknüpfungs-Kanten werden aus den Daten abgeleitet. Freie Kanten zieht man in der Graph-Ansicht mit **Shift + Ziehen**.
+- **Types = sheets**: every type (e.g. `Person`, `Company`) is a base node in the graph and appears as a sheet tab at the bottom.
+- **Rows = instances**: every row is a node connected to its type by a `typeOf` edge.
+- **Header row = properties**: typing a name into the header row creates a column. Instances may have extra properties; they show up as columns automatically.
+- **Data types** (toolbar → column type): Text, Number, Date, Yes/No and *Link to type*. A link cell creates a graph edge; typing an unknown name creates the target instance.
+- Free edges are drawn in the graph view with **Shift + drag**.
 
-## Bedienung
+## Usage
 
 | | |
 |---|---|
-| Zelle bearbeiten | Lostippen, Enter, F2 oder Doppelklick |
-| Bestätigen / Abbrechen | Enter, Tab / Esc |
-| Navigieren | Pfeiltasten, Tab, Enter |
-| Rückgängig / Wiederholen | ⌘Z / ⇧⌘Z |
-| Graph | Ziehen = Knoten/Ansicht verschieben, Mausrad = Zoom, Doppelklick = in Tabelle öffnen |
+| Edit a cell | Start typing, Enter, F2 or double-click |
+| Confirm / cancel | Enter, Tab / Esc |
+| Select a range | Drag, Shift + click, Shift + arrow keys |
+| Copy / cut / paste | ⌘C / ⌘X / ⌘V – works with Numbers, Google Sheets and Excel |
+| Undo / redo | ⌘Z / ⇧⌘Z |
+| Graph | Drag = move node or view, wheel = zoom, double-click = open in table |
 
-**Datei-Menü**: Import/Export als JSON oder GraphML (Gephi, yEd, Cytoscape), Beispieldaten laden. Der Import liest auch das JSON-Format der ersten Version.
+**File menu**: new database, saved databases in this browser, import/export as JSON or GraphML (Gephi, yEd, Cytoscape), sample data.
 
-## Entwicklung
+See [docs/requirements.md](docs/requirements.md) for requirements and decisions.
 
-Stack: Vite, React, TypeScript, Zustand, Vitest. Benötigt eine aktuelle Node.js-LTS-Version.
+## Development
+
+Stack: Vite, React, TypeScript, Zustand, Vitest. Requires a current Node.js LTS.
 
 ```bash
 npm install
@@ -39,4 +42,4 @@ npm run dev
 npm test
 ```
 
-Ein Push auf `main` baut die App per GitHub Actions und veröffentlicht `dist/` auf dem Branch `gh-pages`.
+A push to `main` builds the app with GitHub Actions and publishes `dist/` to the `gh-pages` branch.

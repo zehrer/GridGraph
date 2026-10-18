@@ -9,6 +9,8 @@ import { Toolbar } from "./Toolbar";
 
 export function App() {
   const view = useStore((s) => s.view);
+  const name = useStore((s) => s.db.name);
+  useEffect(() => void (document.title = `${name} – GridGraph`), [name]);
 
   // App-wide shortcuts; text fields keep their own native undo.
   useEffect(() => {

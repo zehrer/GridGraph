@@ -40,7 +40,7 @@ export function fromJSON(text: string): Graph {
   const data = JSON.parse(text);
   const list = <T,>(x: unknown): T[] => (Array.isArray(x) ? x : x && typeof x === "object" ? Object.values(x) : []);
   const nodes = list<NodeInput>(data?.nodes);
-  if (!nodes.length) throw new Error('Keine Knoten gefunden ("nodes" fehlt).');
+  if (!nodes.length) throw new Error('No nodes found ("nodes" is missing).');
   return fromParts(nodes, list<EdgeInput>(data.edges));
 }
 
@@ -75,7 +75,7 @@ ${[...nodes, ...edges].join("\n")}
 
 export function fromGraphML(text: string): Graph {
   const doc = new DOMParser().parseFromString(text, "application/xml");
-  if (doc.querySelector("parsererror")) throw new Error("Ungültiges XML.");
+  if (doc.querySelector("parsererror")) throw new Error("Invalid XML.");
   // Foreign files use generated key ids (d0, d1 …); map them to attribute names.
   const names = new Map([...doc.querySelectorAll("key")].map((k) => [k.id, k.getAttribute("attr.name") ?? k.id]));
   const readData = (el: Element) =>

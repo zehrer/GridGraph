@@ -1,7 +1,11 @@
 import { create } from "zustand";
-import { get as idbGet, set as idbSet } from "idb-keyval";
-import { addType, emptyGraph, typesOf } from "./graph";
+import { addType, emptyGraph, newId, typesOf } from "./graph";
 import type { Graph } from "./types";
+
+/** A database saved in this browser. */
+export interface DbInfo { id: string; name: string; updatedAt: number }
+export const UNTITLED = "Untitled database";
+export const newDbInfo = (name = UNTITLED): DbInfo => ({ id: newId("db"), name, updatedAt: Date.now() });
 
 export type View = "sheet" | "graph";
 /** Sheet cell address: row 0 is the header row, rows ≥ 1 are instances; col 0 is the name column. */
@@ -14,6 +18,11 @@ export const rangeOf = (a: Cell, b: Cell) => ({
 });
 
 interface State {
+  db: DbInfo;
+  /** All databases saved in this browser, most recently saved first. */
+  dbs: DbInfo[];
+  /** Bumped by every change that should be saved. */
+  revision: number;
   graph: Graph;
   past: Graph[];
   future: Graph[];
@@ -33,7 +42,9 @@ interface State {
   edit: (fn: (g: Graph) => void) => void;
   undo: () => void;
   redo: () => void;
-  load: (g: Graph) => void;
+  /** Switches to another database (clears undo history); `dirty` saves it right away. */
+  open: (g: Graph, db: DbInfo, dirty?: boolean) => void;
+  rename: (name: string) => void;
   setView: (view: View, focusNodeId?: string | null) => void;
   setActiveType: (id: string) => void;
   /** Moves the active cell; `extend` keeps the anchor to grow a range. */
@@ -51,6 +62,9 @@ function settle(g: Graph, activeTypeId: string) {
 export const useStore = create<State>()((set, get) => {
   const initial = emptyGraph();
   return {
+    db: newDbInfo(),
+    dbs: [],
+    revision: 0,
     graph: initial,
     past: [],
     future: [],
@@ -68,22 +82,25 @@ export const useStore = create<State>()((set, get) => {
       const { graph, past, activeTypeId } = get();
       const next = structuredClone(graph);
       fn(next);
-      set({ graph: next, past: [...past.slice(-HISTORY), graph], future: [], activeTypeId: settle(next, activeTypeId) });
+      set({ graph: next, past: [...past.slice(-HISTORY), graph], future: [], activeTypeId: settle(next, activeTypeId), revision: get().revision + 1 });
     },
     undo: () => {
       const { graph, past, future, activeTypeId } = get();
       const prev = past.at(-1);
-      if (prev) set({ graph: prev, past: past.slice(0, -1), future: [graph, ...future], activeTypeId: settle(prev, activeTypeId) });
+      if (prev) set({ graph: prev, past: past.slice(0, -1), future: [graph, ...future], activeTypeId: settle(prev, activeTypeId), revision: get().revision + 1 });
     },
     redo: () => {
       const { graph, past, future, activeTypeId } = get();
       const [next, ...rest] = future;
-      if (next) set({ graph: next, past: [...past, graph], future: rest, activeTypeId: settle(next, activeTypeId) });
+      if (next) set({ graph: next, past: [...past, graph], future: rest, activeTypeId: settle(next, activeTypeId), revision: get().revision + 1 });
     },
-    load: (g) => {
-      const { graph, past, activeTypeId } = get();
-      set({ graph: g, past: [...past, graph], future: [], activeTypeId: settle(g, activeTypeId), sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 } });
-    },
+    open: (g, db, dirty = false) =>
+      set({
+        graph: g, db, past: [], future: [], view: "sheet", activeTypeId: settle(g, ""),
+        sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "",
+        savedAt: dirty ? null : new Date(db.updatedAt), revision: get().revision + (dirty ? 1 : 0),
+      }),
+    rename: (name) => set({ db: { ...get().db, name }, revision: get().revision + 1 }),
     setView: (view, focusNodeId = null) => set({ view, focusNodeId }),
     setActiveType: (activeTypeId) => set({ activeTypeId, sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "" }),
     select: (cell, extend = false) => {
@@ -93,26 +110,3 @@ export const useStore = create<State>()((set, get) => {
   };
 });
 
-/** Loads the saved workspace from IndexedDB and autosaves every change (debounced). */
-export async function initPersistence() {
-  try {
-    const saved = await idbGet<Graph>("graph");
-    if (saved?.nodes) {
-      const s = useStore.getState();
-      useStore.setState({ graph: saved, activeTypeId: settle(saved, s.activeTypeId), savedAt: new Date() });
-    }
-  } catch (e) {
-    useStore.setState({ saveError: String(e) });
-  }
-  let timer: ReturnType<typeof setTimeout>;
-  useStore.subscribe((s, prev) => {
-    if (s.graph === prev.graph) return;
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      idbSet("graph", s.graph).then(
-        () => useStore.setState({ savedAt: new Date(), saveError: null }),
-        (e) => useStore.setState({ saveError: String(e) }),
-      );
-    }, 400);
-  });
-}

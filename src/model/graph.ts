@@ -1,4 +1,5 @@
 import type { Column, ColumnType, DerivedEdge, Graph, GraphNode, Value } from "./types";
+import { displayNumber, formatBoolean, formatDate, formatNumber, isBoolean, parseBoolean, parseDate, parseNumber } from "./locale";
 
 export const PALETTE = ["#1a73e8", "#188038", "#e37400", "#9334e6", "#d01884", "#12b5cb", "#d93025", "#5f6368"];
 
@@ -59,7 +60,7 @@ export function edgesOf(g: Graph): DerivedEdge[] {
 export function addType(g: Graph, label?: string): string {
   const id = newId("type");
   const n = typesOf(g).length;
-  g.nodes[id] = { id, label: label ?? `Typ ${n + 1}`, isType: true, color: PALETTE[n % PALETTE.length], columns: [], props: {} };
+  g.nodes[id] = { id, label: label ?? `Type ${n + 1}`, isType: true, color: PALETTE[n % PALETTE.length], columns: [], props: {} };
   return id;
 }
 
@@ -121,17 +122,12 @@ export function parseValue(g: Graph, col: Column, raw: string): Value | undefine
   const s = raw.trim();
   if (!s) return undefined;
   switch (col.type) {
-    case "number": {
-      // "1.234,5" (German) or "1234.5"
-      const n = Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s);
-      return Number.isFinite(n) ? n : s;
-    }
+    case "number":
+      return parseNumber(s) ?? s;
     case "boolean":
-      return /^(ja|j|true|wahr|1|x|yes|y)$/i.test(s);
-    case "date": {
-      const de = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-      return de ? `${de[3]}-${de[2].padStart(2, "0")}-${de[1].padStart(2, "0")}` : s;
-    }
+      return parseBoolean(s);
+    case "date":
+      return parseDate(s) ?? s;
     case "relation": {
       if (!col.targetTypeId || !g.nodes[col.targetTypeId]) return s;
       const hit = instancesOf(g, col.targetTypeId).find((n) => n.label.toLowerCase() === s.toLowerCase());
@@ -142,40 +138,31 @@ export function parseValue(g: Graph, col: Column, raw: string): Value | undefine
   }
 }
 
-const NUMBER = /^-?(\d{1,3}(\.\d{3})+|\d+)(,\d+)?$|^-?\d+(\.\d+)?$/;
-const DATE = /^(\d{1,2}\.\d{1,2}\.\d{4}|\d{4}-\d{2}-\d{2})$/;
-const BOOL = /^(ja|nein|true|false|wahr|falsch)$/i;
-
 /** Column type for pasted values: number, date or yes/no when every non-empty value fits. */
 export function guessType(values: string[]): ColumnType {
   const vs = values.map((v) => v.trim()).filter(Boolean);
   if (!vs.length) return "text";
-  for (const [re, type] of [[NUMBER, "number"], [DATE, "date"], [BOOL, "boolean"]] as const) {
-    if (vs.every((v) => re.test(v))) return type;
-  }
+  if (vs.every((v) => parseNumber(v) !== undefined)) return "number";
+  if (vs.every((v) => parseDate(v))) return "date";
+  if (vs.every(isBoolean)) return "boolean";
   return "text";
 }
 
 /**
- * Editable text of a value (formula bar, cell editor, clipboard). German notation without
- * thousands separators, so `parseValue` and spreadsheet apps read it back unchanged.
+ * Editable text of a value (formula bar, cell editor, clipboard), in the browser locale's
+ * notation without thousands separators, so `parseValue` and spreadsheet apps read it back.
  */
 export function rawValue(g: Graph, col: Column, v: Value | undefined): string {
   if (v === undefined) return "";
   if (col.type === "relation" && typeof v === "string") return g.nodes[v]?.label ?? v;
-  if (col.type === "boolean") return v ? "Ja" : "Nein";
-  if (col.type === "number" && typeof v === "number") return String(v).replace(".", ",");
-  const iso = col.type === "date" && typeof v === "string" && v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return iso ? `${iso[3]}.${iso[2]}.${iso[1]}` : String(v);
+  if (col.type === "boolean") return formatBoolean(!!v);
+  if (col.type === "number" && typeof v === "number") return formatNumber(v);
+  if (col.type === "date" && typeof v === "string") return formatDate(v);
+  return String(v);
 }
 
 export function displayValue(g: Graph, col: Column, v: Value | undefined): string {
-  if (v === undefined) return "";
-  if (col.type === "number" && typeof v === "number") return v.toLocaleString("de-DE");
-  if (col.type === "date" && typeof v === "string") {
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? v : d.toLocaleDateString("de-DE");
-  }
+  if (col.type === "number" && typeof v === "number") return displayNumber(v);
   return rawValue(g, col, v);
 }
 

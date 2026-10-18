@@ -1,6 +1,7 @@
 import { addInstance, addType, columnsOf, deleteNode, emptyGraph, guessType, instancesOf, newId, parseValue, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
 import { download, importText, toGraphML, toJSON } from "../model/io";
 import { sampleGraph } from "../model/sample";
+import { deleteDatabase, openNew } from "../model/persist";
 import { rangeOf, useStore, type Cell } from "../model/store";
 import { parseClipboard, toHTML, toTSV, type Matrix } from "../model/clipboard";
 import type { Column, Graph, GraphNode } from "../model/types";
@@ -70,7 +71,7 @@ export function writeCells(start: Cell, matrix: Matrix): Cell {
       const values = matrix.filter((_, i) => i !== header).map((l) => l[j] ?? "");
       let col = m.columns[c - 1];
       if (c === 0 || (!col && !label && !values.some((v) => v.trim()))) continue;
-      col = col ? { ...col, label: label || col.label } : { key: newId("c"), label: label || `Spalte ${m.columns.length + ++added}`, type: guessType(values) };
+      col = col ? { ...col, label: label || col.label } : { key: newId("c"), label: label || `Column ${m.columns.length + ++added}`, type: guessType(values) };
       upsertColumn(g, m.type.id, col);
       cols.set(c, col);
     }
@@ -138,7 +139,7 @@ export async function pasteFromClipboard() {
     };
     pasteMatrix(parseClipboard(await read("text/html"), await read("text/plain")));
   } catch {
-    alert("Kein Zugriff auf die Zwischenablage – bitte ⌘V verwenden.");
+    alert("No clipboard access – please use ⌘V / Ctrl+V.");
   }
 }
 
@@ -169,7 +170,7 @@ export function deleteRow(row: number) {
 export function deleteColumn(col: number) {
   const m = currentSheet();
   const column = m.columns[col - 1];
-  if (column && confirm(`Spalte „${column.label}“ und ihre Werte löschen?`)) useStore.getState().edit((g) => removeColumn(g, m.type.id, column.key));
+  if (column && confirm(`Delete column "${column.label}" and its values?`)) useStore.getState().edit((g) => removeColumn(g, m.type.id, column.key));
 }
 
 export function newSheet() {
@@ -181,7 +182,7 @@ export function newSheet() {
 export function deleteSheet(typeId: string) {
   const g = useStore.getState().graph;
   const t = g.nodes[typeId];
-  if (t && confirm(`Typ „${t.label}“ mit ${instancesOf(g, typeId).length} Instanzen löschen?`)) useStore.getState().edit((d) => deleteNode(d, typeId));
+  if (t && confirm(`Delete type "${t.label}" and its ${instancesOf(g, typeId).length} instances?`)) useStore.getState().edit((d) => deleteNode(d, typeId));
 }
 
 export function showInSheet(nodeId: string) {
@@ -196,10 +197,12 @@ export function showInSheet(nodeId: string) {
 
 // --- File menu ---
 
-const stamp = () => new Date().toISOString().slice(0, 10);
-export const exportJSON = () => download(toJSON(useStore.getState().graph), `gridgraph-${stamp()}.json`, "application/json");
-export const exportGraphML = () => download(toGraphML(useStore.getState().graph), `gridgraph-${stamp()}.graphml`, "application/xml");
+/** Export file name from the database name, e.g. "Customers 2026-10-18.json". */
+const fileName = (ext: string) => `${useStore.getState().db.name.replace(/[\\/:*?"<>|]/g, "_")} ${new Date().toISOString().slice(0, 10)}.${ext}`;
+export const exportJSON = () => download(toJSON(useStore.getState().graph), fileName("json"), "application/json");
+export const exportGraphML = () => download(toGraphML(useStore.getState().graph), fileName("graphml"), "application/xml");
 
+/** Imports a file as a new database named after the file. */
 export function importFile() {
   const input = document.createElement("input");
   input.type = "file";
@@ -208,16 +211,19 @@ export function importFile() {
     const file = input.files?.[0];
     if (!file) return;
     try {
-      useStore.getState().load(importText(file.name, await file.text()));
+      await openNew(importText(file.name, await file.text()), file.name.replace(/\.[^.]+$/, ""));
     } catch (e) {
-      alert(`Import fehlgeschlagen: ${(e as Error).message}`);
+      alert(`Import failed: ${(e as Error).message}`);
     }
   };
   input.click();
 }
 
-export function newDatabase() {
-  if (confirm("Neue, leere Datenbank anlegen? (Rückgängig ist möglich.)")) useStore.getState().load(emptyGraph());
-}
+export const newDatabase = () => openNew(emptyGraph());
+export const loadSample = () => openNew(sampleGraph(), "Sample data");
 
-export const loadSample = () => useStore.getState().load(sampleGraph());
+export function deleteCurrentDatabase() {
+  const { db, dbs } = useStore.getState();
+  if (!dbs.some((d) => d.id === db.id)) return openNew(emptyGraph());
+  if (confirm(`Permanently delete database "${db.name}" from this browser?`)) deleteDatabase(db.id);
+}

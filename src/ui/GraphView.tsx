@@ -15,7 +15,7 @@ export function GraphView() {
       select: setSelected,
       open: showInSheet,
       connect: (source, target) => {
-        const relation = prompt("Name der Beziehung:", "relatesTo")?.trim();
+        const relation = prompt("Relation name:", "relatesTo")?.trim();
         if (relation) useStore.getState().edit((g) => addEdge(g, source, target, relation));
       },
     });
@@ -38,19 +38,19 @@ export function GraphView() {
     <div className="graph-view">
       <canvas ref={ref} />
       <div className="graph-tools">
-        <button title="Vergrößern" onClick={() => canvas.current?.zoomBy(1.25)}>+</button>
-        <button title="Verkleinern" onClick={() => canvas.current?.zoomBy(0.8)}>−</button>
-        <button title="Alles anzeigen" onClick={() => canvas.current?.fit()}>⤢</button>
+        <button title="Zoom in" onClick={() => canvas.current?.zoomBy(1.25)}>+</button>
+        <button title="Zoom out" onClick={() => canvas.current?.zoomBy(0.8)}>−</button>
+        <button title="Fit to screen" onClick={() => canvas.current?.fit()}>⤢</button>
       </div>
-      <div className="graph-hint">Ziehen: verschieben · Shift + Ziehen: Kante anlegen · Doppelklick: in Tabelle öffnen</div>
+      <div className="graph-hint">Drag: move · Shift + drag: create edge · Double-click: open in table</div>
 
       {node && (
         <aside className="inspector">
           <header>
             <i style={{ background: nodeColor(graph, node) }} />
             <b>{node.label || "—"}</b>
-            <span>{node.isType ? "Typ" : graph.nodes[node.typeId!]?.label}</span>
-            <button title="Schließen" onClick={() => (setSelected(null), canvas.current && (canvas.current.selected = null))}>×</button>
+            <span>{node.isType ? "Type" : graph.nodes[node.typeId!]?.label}</span>
+            <button title="Close" onClick={() => (setSelected(null), canvas.current && (canvas.current.selected = null))}>×</button>
           </header>
           {!node.isType && node.typeId && (
             <dl>
@@ -59,7 +59,7 @@ export function GraphView() {
               ))}
             </dl>
           )}
-          <h4>Kanten</h4>
+          <h4>Edges</h4>
           <ul>
             {edgesOf(graph).filter((e) => e.source === node.id || e.target === node.id).map((e) => {
               const out = e.source === node.id;
@@ -68,19 +68,19 @@ export function GraphView() {
                 <li key={e.id}>
                   <span className="rel">{out ? `${e.relation} →` : `← ${e.relation}`}</span>
                   <a onClick={() => select(other.id)}>{other.label || "—"}</a>
-                  {e.kind !== "typeOf" && <button title="Kante löschen" onClick={() => edit((g) => deleteEdge(g, e))}>×</button>}
+                  {e.kind !== "typeOf" && <button title="Delete edge" onClick={() => edit((g) => deleteEdge(g, e))}>×</button>}
                 </li>
               );
             })}
           </ul>
           <footer>
-            <button onClick={() => showInSheet(node.id)}>In Tabelle öffnen</button>
+            <button onClick={() => showInSheet(node.id)}>Open in table</button>
             <button className="danger" onClick={() => {
-              if (confirm(`„${node.label}“ löschen?`)) {
+              if (confirm(`Delete "${node.label}"?`)) {
                 edit((g) => deleteNode(g, node.id));
                 setSelected(null);
               }
-            }}>Löschen</button>
+            }}>Delete</button>
           </footer>
         </aside>
       )}

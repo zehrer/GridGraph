@@ -3,8 +3,9 @@ import { useStore } from "../model/store";
 import { columnsOf, instancesOf } from "../model/graph";
 import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
+import { openDatabase } from "../model/persist";
 
-const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Strg+";
+const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
 
 export function Header() {
   const [open, setOpen] = useState<number | null>(null);
@@ -15,43 +16,51 @@ export function Header() {
 
   const menus: { label: string; items: MenuItem[] }[] = [
     {
-      label: "Datei",
+      label: "File",
       items: [
-        { label: "Neue Datenbank", action: A.newDatabase },
-        { label: "Importieren (JSON, GraphML) …", shortcut: `${MOD}O`, action: A.importFile },
+        { label: "New database", action: A.newDatabase },
+        { label: "Import (JSON, GraphML)…", shortcut: `${MOD}O`, action: A.importFile },
+        { label: "Open sample data", action: A.loadSample },
         "-",
-        { label: "Exportieren als JSON", action: A.exportJSON },
-        { label: "Exportieren als GraphML", action: A.exportGraphML },
+        { label: "Export as JSON", action: A.exportJSON },
+        { label: "Export as GraphML", action: A.exportGraphML },
         "-",
-        { label: "Beispieldaten laden", action: A.loadSample },
+        ...(s.dbs.length ? [{ heading: "Saved in this browser" }] : []),
+        ...s.dbs.map((d) => ({
+          label: `${d.id === s.db.id ? "✓ " : "\u2003"}${d.name}`,
+          shortcut: new Date(d.updatedAt).toLocaleDateString("de-DE"),
+          action: () => openDatabase(d.id),
+        })),
+        ...(s.dbs.length ? ["-" as const] : []),
+        { label: "Delete database…", disabled: !s.dbs.some((d) => d.id === s.db.id), action: A.deleteCurrentDatabase },
       ],
     },
     {
-      label: "Bearbeiten",
+      label: "Edit",
       items: [
-        { label: "Rückgängig", shortcut: `${MOD}Z`, disabled: !s.past.length, action: s.undo },
-        { label: "Wiederholen", shortcut: `⇧${MOD}Z`, disabled: !s.future.length, action: s.redo },
+        { label: "Undo", shortcut: `${MOD}Z`, disabled: !s.past.length, action: s.undo },
+        { label: "Redo", shortcut: `⇧${MOD}Z`, disabled: !s.future.length, action: s.redo },
         "-",
-        { label: "Ausschneiden", shortcut: `${MOD}X`, action: () => A.copySelection(true) },
-        { label: "Kopieren", shortcut: `${MOD}C`, action: () => A.copySelection() },
-        { label: "Einfügen", shortcut: `${MOD}V`, action: A.pasteFromClipboard },
+        { label: "Cut", shortcut: `${MOD}X`, action: () => A.copySelection(true) },
+        { label: "Copy", shortcut: `${MOD}C`, action: () => A.copySelection() },
+        { label: "Paste", shortcut: `${MOD}V`, action: A.pasteFromClipboard },
         "-",
-        { label: "Zeile löschen", disabled: !hasRow, action: () => A.deleteRow(sel.row) },
-        { label: "Spalte löschen", disabled: !hasCol, action: () => A.deleteColumn(sel.col) },
+        { label: "Delete row", disabled: !hasRow, action: () => A.deleteRow(sel.row) },
+        { label: "Delete column", disabled: !hasCol, action: () => A.deleteColumn(sel.col) },
       ],
     },
     {
-      label: "Einfügen",
+      label: "Insert",
       items: [
-        { label: "Zeile (Instanz)", action: () => s.select({ row: instancesOf(s.graph, s.activeTypeId).length + 1, col: 0 }) },
-        { label: "Spalte (Eigenschaft)", action: () => s.select({ row: 0, col: columnsOf(s.graph, s.activeTypeId).length + 1 }) },
-        { label: "Blatt (Typ)", action: A.newSheet },
+        { label: "Row (instance)", action: () => s.select({ row: instancesOf(s.graph, s.activeTypeId).length + 1, col: 0 }) },
+        { label: "Column (property)", action: () => s.select({ row: 0, col: columnsOf(s.graph, s.activeTypeId).length + 1 }) },
+        { label: "Sheet (type)", action: A.newSheet },
       ],
     },
     {
-      label: "Ansicht",
+      label: "View",
       items: [
-        { label: "Tabelle", action: () => s.setView("sheet") },
+        { label: "Table", action: () => s.setView("sheet") },
         { label: "Graph", action: () => s.setView("graph", A.currentSheet().rows[sel.row - 1]?.id ?? null) },
       ],
     },
@@ -67,7 +76,23 @@ export function Header() {
         <path d="M20 22l4-10" stroke="#fff" strokeWidth="1.6" />
       </svg>
       <div className="title-block">
-        <div className="title">GridGraph</div>
+        <input
+          key={s.db.id}
+          className="title"
+          defaultValue={s.db.name}
+          title="Rename database"
+          onBlur={(e) => {
+            const name = e.target.value.trim();
+            if (!name) e.target.value = s.db.name;
+            else if (name !== s.db.name) s.rename(name);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === "Escape") {
+              if (e.key === "Escape") e.currentTarget.value = s.db.name;
+              e.currentTarget.blur();
+            }
+          }}
+        />
         <nav className="menubar">
           {menus.map((m, i) => (
             <div key={m.label} className="menu-anchor">
@@ -79,7 +104,7 @@ export function Header() {
           ))}
         </nav>
       </div>
-      <div className="save-status">{s.saveError ? "⚠︎ Nicht gespeichert" : s.savedAt ? `Gespeichert ${s.savedAt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}` : ""}</div>
+      <div className="save-status">{s.saveError ? "⚠︎ Not saved" : s.savedAt ? `Saved ${s.savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</div>
     </header>
   );
 }

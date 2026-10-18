@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addInstance, addType, columnsOf, deleteEdge, deleteNode, edgesOf, emptyGraph, parseValue, upsertColumn } from "./graph";
+import { addInstance, addType, columnsOf, deleteEdge, deleteNode, edgesOf, emptyGraph, parseValue, rawValue, upsertColumn } from "./graph";
+import { setLocale } from "./locale";
 import { fromGraphML, fromJSON, toGraphML, toJSON } from "./io";
 import { sampleGraph } from "./sample";
 
@@ -7,13 +8,13 @@ describe("graph model", () => {
   it("derives typeOf and relation edges from the data", () => {
     const edges = edgesOf(sampleGraph());
     expect(edges.filter((e) => e.kind === "typeOf")).toHaveLength(7);
-    expect(edges).toContainEqual(expect.objectContaining({ source: "person_alice", target: "comp_acme", relation: "Arbeitgeber", kind: "column" }));
+    expect(edges).toContainEqual(expect.objectContaining({ source: "person_alice", target: "comp_acme", relation: "Employer", kind: "column" }));
     expect(edges).toContainEqual(expect.objectContaining({ source: "person_alice", target: "person_bob", kind: "free" }));
   });
 
   it("discovers schemaless properties as extra columns", () => {
     const keys = columnsOf(sampleGraph(), "type_person").map((c) => c.key);
-    expect(keys).toEqual(["age", "birthday", "isRemote", "company", "hobbies", "zertifikate"]);
+    expect(keys).toEqual(["age", "birthday", "isRemote", "company", "hobbies", "certificates"]);
   });
 
   it("deleting a type removes its instances and dangling references", () => {
@@ -34,10 +35,20 @@ describe("graph model", () => {
     const g = emptyGraph();
     const t = addType(g, "Firma");
     const acme = addInstance(g, t, "Acme");
-    expect(parseValue(g, { key: "n", label: "n", type: "number" }, "1.234,5")).toBe(1234.5);
-    expect(parseValue(g, { key: "n", label: "n", type: "number" }, "3.14")).toBe(3.14);
-    expect(parseValue(g, { key: "d", label: "d", type: "date" }, "5.3.2024")).toBe("2024-03-05");
-    expect(parseValue(g, { key: "b", label: "b", type: "boolean" }, "Ja")).toBe(true);
+    const num = { key: "n", label: "n", type: "number" as const };
+    const date = { key: "d", label: "d", type: "date" as const };
+    setLocale("de-DE");
+    expect(parseValue(g, num, "1.234,5")).toBe(1234.5);
+    expect(parseValue(g, date, "5.3.2024")).toBe("2024-03-05");
+    expect(rawValue(g, num, 0.5)).toBe("0,5");
+    setLocale("en-US");
+    expect(parseValue(g, num, "1,234.5")).toBe(1234.5);
+    expect(parseValue(g, num, "3.14")).toBe(3.14);
+    expect(parseValue(g, date, "3/5/2024")).toBe("2024-03-05");
+    expect(parseValue(g, date, "2/30/2024")).toBe("2/30/2024");
+    expect(rawValue(g, date, "2024-03-05")).toBe("03/05/2024");
+    expect(parseValue(g, { key: "b", label: "b", type: "boolean" }, "TRUE")).toBe(true);
+    expect(parseValue(g, { key: "b", label: "b", type: "boolean" }, "no")).toBe(false);
     const rel = { key: "r", label: "r", type: "relation" as const, targetTypeId: t };
     expect(parseValue(g, rel, "acme")).toBe(acme);
     const created = parseValue(g, rel, "Neu GmbH") as string;

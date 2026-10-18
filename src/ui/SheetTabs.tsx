@@ -18,9 +18,9 @@ export function SheetTabs() {
 
   return (
     <footer className="sheet-tabs">
-      <button className="icon" title="Blatt (Typ) hinzufügen" onClick={newSheet}>+</button>
+      <button className="icon" title="Add sheet (type)" onClick={newSheet}>+</button>
       <div className="menu-anchor">
-        <button className="icon" title="Alle Blätter" onClick={() => setMenu("list")}>≡</button>
+        <button className="icon" title="All sheets" onClick={() => setMenu("list")}>≡</button>
         {menu === "list" && <MenuList up onClose={() => setMenu(null)} items={types.map((t) => ({ label: t.label, action: () => setActiveType(t.id) }))} />}
       </div>
       {types.map((t) => {
@@ -51,12 +51,12 @@ export function SheetTabs() {
             {active && <button className="caret" onClick={(e) => (e.stopPropagation(), setMenu(t.id))}>▾</button>}
             {menu === t.id && (
               <MenuList up onClose={() => setMenu(null)} items={[
-                { label: "Umbenennen", action: () => setRenaming(t.id) },
-                { label: "Löschen", action: () => deleteSheet(t.id) },
+                { label: "Rename", action: () => setRenaming(t.id) },
+                { label: "Delete", action: () => deleteSheet(t.id) },
               ]}>
                 <div className="swatches">
                   {PALETTE.map((c) => (
-                    <button key={c} style={{ background: c }} className={c === t.color ? "on" : ""} title="Farbe" onClick={() => {
+                    <button key={c} style={{ background: c }} className={c === t.color ? "on" : ""} title="Color" onClick={() => {
                       setMenu(null);
                       edit((g) => (g.nodes[t.id].color = c));
                     }} />

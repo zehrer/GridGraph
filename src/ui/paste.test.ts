@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseClipboard, parseTSV, toTSV } from "../model/clipboard";
 import { guessType } from "../model/graph";
+import { setLocale } from "../model/locale";
 import { emptyGraph } from "../model/graph";
-import { useStore } from "../model/store";
+import { newDbInfo, useStore } from "../model/store";
 import { cellText, currentSheet, pasteMatrix, selectionMatrix, writeCells } from "./actions";
+
+beforeEach(() => setLocale("en-US"));
 
 describe("clipboard formats", () => {
   it("parses quoted TSV cells with tabs, quotes and newlines", () => {
@@ -18,31 +21,31 @@ describe("clipboard formats", () => {
   });
 
   it("guesses column types", () => {
-    expect(guessType(["1.234,5", "42", ""])).toBe("number");
-    expect(guessType(["01.02.2024", "2024-03-05"])).toBe("date");
-    expect(guessType(["WAHR", "falsch"])).toBe("boolean");
+    expect(guessType(["1,234.5", "42", ""])).toBe("number");
+    expect(guessType(["01/02/2024", "2024-03-05"])).toBe("date");
+    expect(guessType(["TRUE", "no"])).toBe("boolean");
     expect(guessType(["12", "abc"])).toBe("text");
   });
 });
 
 describe("writing cells", () => {
-  beforeEach(() => useStore.getState().load(emptyGraph()));
+  beforeEach(() => useStore.getState().open(emptyGraph(), newDbInfo()));
 
   it("pasting a table into an empty sheet uses the first line as header", () => {
     useStore.getState().select({ row: 1, col: 0 });
-    pasteMatrix(parseTSV("Name\tAlter\tGeburtstag\tAktiv\nAlice\t32,5\t14.05.1994\tja\nBob\t28\t\tnein"));
+    pasteMatrix(parseTSV("Name\tAge\tBirthday\tActive\nAlice\t32.5\t05/14/1994\tTRUE\nBob\t28\t\tFALSE"));
     const m = currentSheet();
-    expect(m.columns.map((c) => [c.label, c.type])).toEqual([["Alter", "number"], ["Geburtstag", "date"], ["Aktiv", "boolean"]]);
+    expect(m.columns.map((c) => [c.label, c.type])).toEqual([["Age", "number"], ["Birthday", "date"], ["Active", "boolean"]]);
     expect(m.rows.map((r) => [r.label, ...Object.values(r.props)])).toEqual([["Alice", 32.5, "1994-05-14", true], ["Bob", 28, false]]);
     // The pasted block is selected and copies back the same table.
-    expect(selectionMatrix()).toEqual([["Name", "Alter", "Geburtstag", "Aktiv"], ["Alice", "32,5", "14.05.1994", "Ja"], ["Bob", "28", "", "Nein"]]);
+    expect(selectionMatrix()).toEqual([["Name", "Age", "Birthday", "Active"], ["Alice", "32.5", "05/14/1994", "TRUE"], ["Bob", "28", "", "FALSE"]]);
   });
 
   it("pasting into existing rows overwrites values and appends new rows", () => {
-    writeCells({ row: 0, col: 0 }, [["Name", "Stadt"], ["Acme", "Berlin"]]);
-    writeCells({ row: 1, col: 1 }, [["München"], ["Hamburg"]]);
+    writeCells({ row: 0, col: 0 }, [["Name", "City"], ["Acme", "Berlin"]]);
+    writeCells({ row: 1, col: 1 }, [["Munich"], ["Hamburg"]]);
     const m = currentSheet();
-    expect(m.rows.map((r) => cellText(useStore.getState().graph, m, { row: m.rows.indexOf(r) + 1, col: 1 }))).toEqual(["München", "Hamburg"]);
+    expect(m.rows.map((r) => cellText(useStore.getState().graph, m, { row: m.rows.indexOf(r) + 1, col: 1 }))).toEqual(["Munich", "Hamburg"]);
     expect(m.rows[1].label).toBe("");
   });
 });

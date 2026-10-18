@@ -55,7 +55,7 @@ export function Sheet() {
     select(cell, e.shiftKey);
     const column = m.columns[cell.col - 1];
     if ((e.target as HTMLElement).tagName === "INPUT" && column?.type === "boolean") {
-      commitCell(cell, cellText(graph, m, cell) === "Ja" ? "nein" : "ja");
+      commitCell(cell, String(m.rows[cell.row - 1]?.props[column.key] !== true));
     }
   }).current;
 
@@ -150,14 +150,14 @@ export function Sheet() {
     onCell,
   });
 
-  const title = sel.col === 0 ? "Name" : (m.columns[sel.col - 1]?.label ?? "neue Spalte");
+  const title = sel.col === 0 ? "Name" : (m.columns[sel.col - 1]?.label ?? "new column");
   const multi = range.r0 !== range.r1 || range.c0 !== range.c1;
 
   return (
     <div className="sheet">
       <div className="formula-bar">
         <div className="name-box" title={title}>
-          {multi ? `${range.r1 - range.r0 + 1} × ${range.c1 - range.c0 + 1}` : sel.row === 0 ? `${title} (Kopf)` : `${title} ${sel.row}`}
+          {multi ? `${range.r1 - range.r0 + 1} × ${range.c1 - range.c0 + 1}` : sel.row === 0 ? `${title} (header)` : `${title} ${sel.row}`}
         </div>
         <span className="fx">fx</span>
         <input
@@ -180,9 +180,9 @@ export function Sheet() {
           </tbody>
         </table>
         <div className="add-rows">
-          <button onClick={() => setExtraRows(extraRows + (parseInt(addCount) || 0))}>Hinzufügen</button>
+          <button onClick={() => setExtraRows(extraRows + (parseInt(addCount) || 0))}>Add</button>
           <input value={addCount} onChange={(e) => setAddCount(e.target.value.replace(/\D/g, ""))} />
-          <span>weitere Zeilen unten</span>
+          <span>more rows at the bottom</span>
         </div>
         {target && (
           <datalist id="relation-options">

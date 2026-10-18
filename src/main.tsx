@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { initPersistence } from "./model/store";
+import { initPersistence } from "./model/persist";
 import { App } from "./ui/App";
 import "./styles.css";
 
