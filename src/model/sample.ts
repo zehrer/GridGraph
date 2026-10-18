@@ -12,6 +12,7 @@ export function sampleGraph(): Graph {
     type("type_person", "Person", "#1a73e8", [
       { key: "age", label: "Age", type: "number", summary: "avg" },
       { key: "birthday", label: "Birthday", type: "date" },
+      { key: "currentAge", label: "Current age", type: "formula", formula: "AGE([Birthday])" },
       { key: "isRemote", label: "Remote", type: "boolean" },
       { key: "company", label: "Employer", type: "relation", targetTypeId: "type_company", width: 150 },
     ]),
@@ -23,6 +24,7 @@ export function sampleGraph(): Graph {
     type("type_project", "Project", "#e37400", [
       { key: "budget", label: "Budget (€)", type: "number", summary: "sum" },
       { key: "deadline", label: "Deadline", type: "date" },
+      { key: "daysLeft", label: "Days left", type: "formula", formula: "[Deadline] - TODAY()" },
       { key: "client", label: "Client", type: "relation", targetTypeId: "type_company", width: 150 },
       { key: "lead", label: "Lead", type: "relation", targetTypeId: "type_person", width: 140 },
     ], "Project name"),

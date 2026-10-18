@@ -3,11 +3,12 @@ import { rangeOf, useStore, type Cell } from "../model/store";
 import { displayValue, linkIds, nodeColor, nodeName } from "../model/graph";
 import { parseClipboard, toHTML, toTSV } from "../model/clipboard";
 import { SUMMARIES, summarize } from "../model/summary";
+import { shownColumn } from "../model/formula";
 import type { Column, Graph, GraphNode } from "../model/types";
 import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
 
-const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗" };
+const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗", formula: "ƒ" };
 const MOVES: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
 const ID_WIDTH = 56;
 const DEFAULT_WIDTH = 120;
@@ -64,11 +65,13 @@ export function Sheet() {
     if (e.type === "dblclick") {
       // Double-clicking a link opens its target (the clicked one, if there are several); Enter, F2 or typing still edit the cell.
       const column = m.columns[cell.col - 1];
-      const targets = column?.type === "relation" && cell.row > 0 ? linkIds(m.rows[cell.row - 1]?.props[column.key]).filter((id) => graph.nodes[id]) : [];
+      const node = cell.row > 0 ? m.rows[cell.row - 1] : undefined;
+      const shown = column && node ? shownColumn(graph, node, column) : undefined;
+      const targets = shown?.col.type === "relation" ? linkIds(shown.value).filter((id) => graph.nodes[id]) : [];
       const clicked = (e.target as HTMLElement).closest<HTMLElement>("[data-node]")?.dataset.node;
       const target = clicked ?? (targets.length === 1 ? targets[0] : undefined);
       if (target) return A.followLink(target);
-      return !A.readOnly(cell) && setEdit({ cell, text: A.cellText(graph, m, cell) });
+      return !A.readOnly(m, cell) && setEdit({ cell, text: A.cellText(graph, m, cell) });
     }
     if (e.type === "mouseenter") return dragging.current && select(cell, true);
     if (e.button !== 0) return;
@@ -129,9 +132,9 @@ export function Sheet() {
     } else if (delta) {
       e.preventDefault();
       move(delta[0], delta[1], sel, e.shiftKey && e.key in MOVES);
-    } else if (A.readOnly(sel) && e.key.length === 1) {
+    } else if (A.readOnly(m, sel) && e.key.length === 1) {
       e.preventDefault();
-    } else if ((e.key === "Enter" || e.key === "F2") && !A.readOnly(sel)) {
+    } else if ((e.key === "Enter" || e.key === "F2") && !A.readOnly(m, sel)) {
       e.preventDefault();
       select(sel);
       setEdit({ cell: sel, text: A.cellText(graph, m, sel) });
@@ -166,7 +169,10 @@ export function Sheet() {
       { label: "Move left", disabled: col <= 1, action: () => A.moveColumnTo(col, col - 1) },
       { label: "Move right", disabled: col >= m.columns.length, action: () => A.moveColumnTo(col, col + 1) },
       { label: `${c.wrap ? "✓ " : ""}Wrap text`, action: () => A.toggleWrap(col) },
-      { label: isName ? "✓ Name column" : "Use as name column", disabled: isName || c.type === "relation", action: () => A.setNameColumn(col) },
+      { label: isName ? "✓ Name column" : "Use as name column", disabled: isName || c.type === "relation" || c.type === "formula", action: () => A.setNameColumn(col) },
+      ...(c.type === "formula"
+        ? [{ label: "Edit formula…", action: () => A.openFormula(c.key) }, { label: "Convert to values", action: () => A.convertToValues(col) }]
+        : [{ label: "Formula…", disabled: isName, action: () => A.openFormula(c.key) }]),
       "-",
       { label: "Hide column", action: () => A.hideColumn(col) },
       { label: "Delete column", disabled: isName, action: () => A.deleteColumn(col) },
@@ -342,7 +348,7 @@ export function Sheet() {
         <span className="fx">fx</span>
         <input
           value={edit ? edit.text : A.cellText(graph, m, sel)}
-          readOnly={A.readOnly(sel)}
+          readOnly={A.readOnly(m, sel)}
           onChange={(e) => setEdit({ cell: edit?.cell ?? sel, text: e.target.value, inBar: true })}
           onKeyDown={onEditorKey}
           onBlur={() => editRef.current?.inBar && finish(true)}
@@ -437,11 +443,15 @@ const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, rangeC
   );
 });
 
-function CellContent({ col, node, column, graph }: { col: number; node?: GraphNode; column?: Column; graph: Graph }) {
+function CellContent({ col, node, column: stored, graph }: { col: number; node?: GraphNode; column?: Column; graph: Graph }) {
   if (!node) return null;
   if (col === 0) return <>{node.no}</>;
-  const v = column && node.props[column.key];
-  if (!column || v === undefined) return null;
+  if (!stored) return null;
+  // Formula columns show their result like a column of the result's type.
+  const { col: column, value: v, error } = shownColumn(graph, node, stored);
+  if (error) return <span className="formula-error" title={error}>#ERROR</span>;
+  if (v === undefined) return null;
+  if (stored.type === "formula" && column.type === "number") return <span className="num-value">{displayValue(graph, column, v)}</span>;
   if (column.type === "boolean") return <input type="checkbox" checked={!!v} readOnly tabIndex={-1} />;
   if (column.type === "relation") {
     return (

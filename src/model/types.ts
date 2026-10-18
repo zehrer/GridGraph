@@ -1,4 +1,5 @@
-export type ColumnType = "text" | "number" | "date" | "boolean" | "relation";
+/** "formula" columns compute their values from `formula`; nothing is stored in the rows. */
+export type ColumnType = "text" | "number" | "date" | "boolean" | "relation" | "formula";
 /** A link cell holds one node id, or several as an array. */
 export type Value = string | number | boolean | string[];
 /** Aggregate shown in the sheet footer. */
@@ -17,6 +18,8 @@ export interface Column {
   summary?: Summary;
   /** Date format (e.g. "DD.MM.YYYY") or number format (e.g. "EUR"); see locale.ts. */
   format?: string;
+  /** For formula columns, e.g. "AGE([Birthday])"; see formula.ts. */
+  formula?: string;
 }
 
 /**

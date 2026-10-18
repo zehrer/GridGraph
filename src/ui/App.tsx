@@ -5,6 +5,7 @@ import { GraphView } from "./GraphView";
 import { Header } from "./Header";
 import { Sheet } from "./Sheet";
 import { SheetTabs } from "./SheetTabs";
+import { FormulaEditor } from "./FormulaEditor";
 import { Toolbar } from "./Toolbar";
 
 export function App() {
@@ -38,6 +39,7 @@ export function App() {
       <Toolbar />
       <main>{view === "sheet" ? <Sheet key={notation} /> : <GraphView />}</main>
       <SheetTabs />
+      <FormulaEditor />
     </div>
   );
 }

@@ -43,6 +43,7 @@ export function Toolbar() {
         {TYPES.map(([v, l]) => (
           <option key={v} value={v}>{l}</option>
         ))}
+        <option value="formula">ƒ Formula…</option>
         <optgroup label="Link to …">
           {typesOf(s.graph).map((t) => (
             <option key={t.id} value={`rel:${t.id}`}>→ {t.label}</option>

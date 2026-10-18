@@ -6,7 +6,7 @@ import { displayNumber, formatNumber, parseNumber, setLocale } from "../model/lo
 import { emptyGraph } from "../model/graph";
 import { newDbInfo, useStore } from "../model/store";
 import { sampleGraph } from "../model/sample";
-import { addRow, followLink, goBack, selectionValues, commitCell, formatColumns, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
+import { addFormulaColumn, addRow, convertToValues, followLink, setFormula, goBack, selectionValues, commitCell, formatColumns, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
 
 beforeEach(() => setLocale("en-US"));
 
@@ -217,6 +217,30 @@ describe("following links", () => {
     expect(currentSheet().rows[s.sel.row - 1].id).toBe("person_alice");
     goBack();
     expect(useStore.getState()).toMatchObject({ activeTypeId: "type_project", sel: { row: 1, col: 5 }, back: null });
+  });
+});
+
+describe("formula columns", () => {
+  it("show results, ignore typing, follow renames and can become plain values", () => {
+    useStore.getState().open(sampleGraph(), newDbInfo());
+    useStore.getState().setActiveType("type_project");
+    addFormulaColumn();
+    const key = useStore.getState().formulaEditor!;
+    setFormula(key, "[Budget (€)] / 1000");
+    const col = () => currentSheet().columns.findIndex((c) => c.key === key) + 1;
+    const text = (row: number) => cellText(useStore.getState().graph, currentSheet(), { row, col: col() });
+    expect([text(1), text(2)]).toEqual(["150", "85"]);
+    expect(summarize(useStore.getState().graph, currentSheet().columns[col() - 1], currentSheet().rows, "sum")).toBe("Sum 235");
+    // Typing into a formula cell does nothing; renaming the referenced column updates the formula.
+    writeCells({ row: 1, col: col() }, [["999"]]);
+    expect(text(1)).toBe("150");
+    const budget = currentSheet().columns.findIndex((c) => c.key === "budget") + 1;
+    writeCells({ row: 0, col: budget }, [["Budget"]]);
+    expect(currentSheet().columns[col() - 1].formula).toBe("[Budget] / 1000");
+    expect(text(2)).toBe("85");
+    convertToValues(col());
+    expect(currentSheet().columns[col() - 1]).toMatchObject({ type: "number", formula: undefined });
+    expect(currentSheet().rows[0].props[key]).toBe(150);
   });
 });
 

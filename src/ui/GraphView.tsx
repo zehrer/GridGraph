@@ -3,6 +3,7 @@ import { useStore } from "../model/store";
 import { addEdge, columnsOf, deleteEdge, deleteNode, displayValue, edgesOf, instancesOf, nodeColor, nodeName, typesOf } from "../model/graph";
 import { showInSheet } from "./actions";
 import { GraphCanvas } from "./graph-canvas";
+import { shownColumn } from "../model/formula";
 
 export function GraphView() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -81,9 +82,13 @@ export function GraphView() {
           </header>
           {!node.isType && node.typeId && (
             <dl>
-              {columnsOf(graph, node.typeId).filter((c) => c.key !== graph.nodes[node.typeId!].nameKey && node.props[c.key] !== undefined).map((c) => (
-                <div key={c.key}><dt>{c.label}</dt><dd>{displayValue(graph, c, node.props[c.key])}</dd></div>
-              ))}
+              {columnsOf(graph, node.typeId)
+                .filter((c) => c.key !== graph.nodes[node.typeId!].nameKey)
+                .map((c) => ({ c, ...shownColumn(graph, node, c) }))
+                .filter(({ value }) => value !== undefined)
+                .map(({ c, col, value }) => (
+                  <div key={c.key}><dt>{c.label}</dt><dd>{displayValue(graph, col, value)}</dd></div>
+                ))}
             </dl>
           )}
           <h4>Edges</h4>

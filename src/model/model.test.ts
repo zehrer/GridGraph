@@ -14,7 +14,7 @@ describe("graph model", () => {
 
   it("discovers schemaless properties as extra columns", () => {
     const keys = columnsOf(sampleGraph(), "type_person").map((c) => c.key);
-    expect(keys).toEqual(["name", "age", "birthday", "isRemote", "company", "hobbies", "certificates"]);
+    expect(keys).toEqual(["name", "age", "birthday", "currentAge", "isRemote", "company", "hobbies", "certificates"]);
   });
 
   it("deleting a type removes its instances and dangling references", () => {

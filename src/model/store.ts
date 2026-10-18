@@ -56,6 +56,8 @@ interface State {
   focusNodeId: string | null;
   /** Types whose nodes the graph leaves out (toggled in the legend; kept for the session). */
   hiddenTypes: string[];
+  /** Key of the column whose formula is being edited (active sheet). */
+  formulaEditor: string | null;
   /** Where "Back" returns to after following a link. */
   back: { typeId: string; sel: Cell } | null;
   /** Sheet view options; key "" sorts by name. */
@@ -110,6 +112,7 @@ export const useStore = create<State>()((set, get) => {
     anchor: { row: 1, col: 0 },
     focusNodeId: null,
     back: null,
+    formulaEditor: null,
     hiddenTypes: [],
     sort: null,
     filter: "",

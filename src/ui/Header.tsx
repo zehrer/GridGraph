@@ -18,15 +18,17 @@ function formatItems(): MenuItem[] {
   const check = (on: boolean, label: string) => `${on ? "✓ " : "\u2003"}${label}`;
   // format "" is the automatic (locale) notation.
   const item = (type: Column["type"], format: string, label: string, example?: string): MenuItem => ({
-    label: check(c?.type === type && (c.format ?? "") === format, label),
+    // Formula columns keep their formula; for them number and date items only set the format.
+    label: check((c?.type === type || (c?.type === "formula" && (type === "number" || type === "date"))) && (c.format ?? "") === format, label),
     shortcut: example,
-    disabled: off,
+    disabled: off || (c.type === "formula" && type !== "number" && type !== "date"),
     action: () => A.formatColumns(type, format),
   });
   return [
     { heading: off ? "Select a column to format" : cols.length > 1 ? `${cols.length} columns` : `Column "${c.label}"` },
     item("text", "", "Text"),
     item("boolean", "", "Yes / No"),
+    { label: check(c?.type === "formula", c?.type === "formula" ? "Formula… (edit)" : "Formula…"), shortcut: "ƒ", disabled: off || c.key === A.currentSheet().type.nameKey, action: () => A.openFormula(c.key) },
     "-",
     { heading: "Number" },
     item("number", "", "Automatic", displayNumber(1234.5)),
@@ -108,6 +110,7 @@ export function Header() {
       items: [
         { label: "Row", action: A.addRow },
         { label: "Column", action: () => s.select({ row: 0, col: m.columns.length + 1 }) },
+        { label: "Formula column…", disabled: !sheet, action: A.addFormulaColumn },
         { label: "Sheet (type)", action: A.newSheet },
       ],
     },

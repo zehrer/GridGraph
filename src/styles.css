@@ -231,3 +231,16 @@ main { flex: 1; min-height: 0; display: flex; }
 .grid td.wrap .chip { margin: 1px 4px 1px 0; }
 .graph-legend button.off { color: var(--muted); text-decoration: line-through; }
 .graph-legend button.off i { opacity: 0.3; }
+.num-value { display: block; text-align: right; }
+.formula-error { color: #b3261e; font-weight: 500; }
+.dialog.formula { width: min(560px, calc(100vw - 32px)); }
+.dialog.formula textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid #747775; border-radius: 6px; resize: vertical;
+  font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+}
+.dialog.formula .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.dialog.formula .chips button { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 2px 8px; font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.dialog.formula .chips button:hover { background: var(--accent-soft); }
+.dialog.formula .preview { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
+.dialog.formula .preview td { padding: 3px 6px; border-bottom: 1px solid #f1f3f4; }
+.dialog.formula .preview td:last-child { text-align: right; font-weight: 500; }

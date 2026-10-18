@@ -34,6 +34,19 @@ Live: https://zehrer.github.io/GridGraph/
 | Undo / redo | ⌘Z / ⇧⌘Z |
 | Graph | Drag = move node or view, wheel = zoom, double-click = open in table |
 
+**Formulas** (Insert → Formula column…): computed columns, e.g.
+
+```
+AGE([Birthday])
+[Deadline] - TODAY()
+[Name] & " (" & [City] & ")"
+IF([Age] >= 40, "senior", "junior")
+[Employer].[City]
+SUM([Client].[Employees])
+```
+
+Columns are referenced by name; `.[Column]` follows a link. Functions: IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT.
+
 **File menu**: new database, saved databases in this browser, import/export as JSON or GraphML (Gephi, yEd, Cytoscape), sample data.
 
 See [docs/requirements.md](docs/requirements.md) for requirements and decisions.

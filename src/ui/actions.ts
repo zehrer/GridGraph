@@ -1,5 +1,6 @@
-import { addInstance, addType, columnsOf, convertColumn, deleteNode, renumber, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
+import { addInstance, addType, columnsOf, convertColumn, deleteNode, renumber, typesOf, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
 import { guessDateFormat, parseNumber } from "../model/locale";
+import { cellValue, renameReference, shownColumn } from "../model/formula";
 import { download, importText, toGraphML, toJSON } from "../model/io";
 import { sampleGraph } from "../model/sample";
 import { deleteDatabase, openNew } from "../model/persist";
@@ -28,9 +29,13 @@ export function sheetModel(g: Graph, typeId: string, { sort, filter }: SheetView
   const columns = all.filter((c) => !c.hidden);
   const q = filter.trim().toLowerCase();
   let rows = instancesOf(g, typeId);
-  if (q) rows = rows.filter((n) => [String(n.no), ...all.map((c) => rawValue(g, c, n.props[c.key]))].some((v) => v.toLowerCase().includes(q)));
+  if (q) rows = rows.filter((n) => [String(n.no), ...all.map((c) => textOf(g, n, c))].some((v) => v.toLowerCase().includes(q)));
   const col = sort && all.find((c) => c.key === sort.key);
-  const key = (n: GraphNode) => (col ? (col.type === "relation" ? rawValue(g, col, n.props[col.key]) : n.props[col.key]) : n.no) ?? "";
+  const key = (n: GraphNode) => {
+    if (!col) return n.no ?? "";
+    const { col: shown, value } = shownColumn(g, n, col);
+    return (shown.type === "relation" ? rawValue(g, shown, value) : Array.isArray(value) ? value.join(", ") : value) ?? "";
+  };
   const asc = sort?.asc ?? true;
   rows = [...rows].sort((a, b) => {
     const [x, y] = [key(a), key(b)];
@@ -51,11 +56,17 @@ export function cellText(g: Graph, m: SheetModel, { row, col }: Cell): string {
   if (row === 0) return col === 0 ? "ID" : (column?.label ?? "");
   const node = m.rows[row - 1];
   if (!node) return "";
-  return col === 0 ? String(node.no ?? "") : column ? rawValue(g, column, node.props[column.key]) : "";
+  return col === 0 ? String(node.no ?? "") : column ? textOf(g, node, column) : "";
 }
 
-/** The ID column and its header are assigned by the app. */
-export const readOnly = ({ col }: Cell) => col === 0;
+/** Editable text of a cell value; formula columns give their computed result (or the error). */
+export function textOf(g: Graph, node: GraphNode, col: Column): string {
+  const { col: shown, value, error } = shownColumn(g, node, col);
+  return error ? "#ERROR" : rawValue(g, shown, value);
+}
+
+/** IDs and formula results are computed by the app and cannot be typed over. */
+export const readOnly = (m: SheetModel, { row, col }: Cell) => col === 0 || (row > 0 && m.columns[col - 1]?.type === "formula");
 
 /**
  * Writes a block of text into the sheet starting at `start`, as one undoable step.
@@ -79,6 +90,7 @@ export function writeCells(start: Cell, matrix: Matrix): { start: Cell; width: n
   const header = start.row === 0 ? 0 : -1;
   const width = Math.max(...matrix.map((l) => l.length));
   const cols = new Map<number, Column>();
+  const renames: [string, string][] = [];
   let added = 0;
 
   useStore.getState().edit((g) => {
@@ -88,6 +100,7 @@ export function writeCells(start: Cell, matrix: Matrix): { start: Cell; width: n
       const values = matrix.filter((_, i) => i !== header).map((l) => l[j] ?? "");
       let col = m.columns[c - 1];
       if (!col && !label && !values.some((v) => v.trim())) continue;
+      if (col && label && label !== col.label) renames.push([col.label, label]);
       // An empty, unformatted text column (e.g. one whose heading was typed first) takes the type of its first values.
       const blank = col?.type === "text" && !col.format && col.key !== m.type.nameKey && !instancesOf(g, m.type.id).some((n) => n.props[col!.key] !== undefined);
       const guessed = (): Partial<Column> => {
@@ -111,9 +124,13 @@ export function writeCells(start: Cell, matrix: Matrix): { start: Cell; width: n
       }
       line.forEach((text, j) => {
         const col = cols.get(start.col + j);
-        if (col) setProp(g, id, col.key, parseValue(g, col, text));
+        if (col && col.type !== "formula") setProp(g, id, col.key, parseValue(g, col, text));
       });
     });
+    // Formulas refer to columns by name: follow renames.
+    for (const [from, to] of renames) {
+      for (const t of typesOf(g)) for (const c of t.columns ?? []) if (c.formula) c.formula = renameReference(c.formula, from, to);
+    }
   });
   return { start, width };
 }
@@ -131,13 +148,13 @@ export function selectionMatrix(): Matrix {
 }
 
 /** Stored values of the selected data cells (IDs and the header row excluded), and their common number format. */
-export function selectionValues(): { values: Value[]; cells: number; format?: string } {
+export function selectionValues(): { values: (Value | undefined)[]; cells: number; format?: string } {
   const { anchor, sel } = useStore.getState();
   const m = currentSheet();
   const { r0, r1, c0, c1 } = rangeOf(anchor, sel);
   const cols = m.columns.slice(Math.max(c0, 1) - 1, c1);
   const rows = m.rows.slice(Math.max(r0, 1) - 1, r1);
-  const values = rows.flatMap((n) => cols.map((c) => n.props[c.key]));
+  const values = rows.flatMap((n) => cols.map((c) => cellValue(useStore.getState().graph, n, c)));
   const formats = new Set(cols.map((c) => (c.type === "number" ? (c.format ?? "") : "")));
   return { values, cells: (r1 - r0 + 1) * (c1 - c0 + 1), format: formats.size === 1 ? [...formats][0] || undefined : undefined };
 }
@@ -226,7 +243,44 @@ const editColumn = (col: number, patch: Partial<Column>) => {
 export function setColumnType(col: number, type: Column["type"], targetTypeId?: string) {
   const m = currentSheet();
   const c = m.columns[col - 1];
-  if (c) useStore.getState().edit((g) => convertColumn(g, m.type.id, c, type, targetTypeId));
+  if (!c) return;
+  if (type === "formula") return openFormula(c.key);
+  useStore.getState().edit((g) => convertColumn(g, m.type.id, c.type === "formula" ? freeze(g, m.type.id, c) : c, type, targetTypeId));
+}
+
+/** Turns a formula column into a plain column holding its current results. */
+function freeze(g: Graph, typeId: string, c: Column): Column {
+  const rows = instancesOf(g, typeId).map((n) => [n, shownColumn(g, n, c)] as const);
+  const types = new Set(rows.filter(([, r]) => r.value !== undefined).map(([, r]) => r.col.type));
+  const type = types.size === 1 ? [...types][0] : "text";
+  for (const [n, r] of rows) setProp(g, n.id, c.key, r.value === undefined ? undefined : type === "text" ? rawValue(g, r.col, r.value) : r.value);
+  const plain: Column = { ...c, type: type === "formula" ? "text" : type, formula: undefined };
+  upsertColumn(g, typeId, plain);
+  return plain;
+}
+
+export function convertToValues(col: number) {
+  const c = column(col);
+  if (c?.type === "formula") useStore.getState().edit((g) => freeze(g, useStore.getState().activeTypeId, c));
+}
+
+/** Opens the formula editor for a column of the active sheet. */
+export const openFormula = (key: string) => useStore.setState({ formulaEditor: key });
+
+export function setFormula(key: string, formula: string) {
+  const typeId = useStore.getState().activeTypeId;
+  const c = currentSheet().all.find((x) => x.key === key);
+  if (c) useStore.getState().edit((g) => upsertColumn(g, typeId, { ...c, type: "formula", formula, targetTypeId: undefined }));
+}
+
+/** Insert → Formula column: adds a column and opens its formula editor. */
+export function addFormulaColumn() {
+  const m = currentSheet();
+  const key = newId("c");
+  const label = `Formula ${m.all.filter((c) => c.type === "formula").length + 1}`;
+  useStore.getState().edit((g) => upsertColumn(g, m.type.id, { key, label, type: "formula", formula: "" }));
+  useStore.getState().select({ row: 0, col: currentSheet().columns.findIndex((c) => c.key === key) + 1 });
+  openFormula(key);
 }
 
 /** Columns covered by the selection (the ID column excluded). */
@@ -246,7 +300,9 @@ export function formatColumns(type: Column["type"], format = "") {
   if (!cols.length) return;
   useStore.getState().edit((g) => {
     for (const c of cols) {
-      if (c.type !== type) convertColumn(g, typeId, c, type, undefined, format || undefined);
+      // Formula columns keep their formula; only how numbers or dates are shown changes.
+      if (c.type === "formula" && type !== "number" && type !== "date") continue;
+      if (c.type !== type && c.type !== "formula") convertColumn(g, typeId, c, type, undefined, format || undefined);
       patchColumn(g, typeId, c.key, { format: format || undefined });
     }
   });

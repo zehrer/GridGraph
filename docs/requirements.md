@@ -80,6 +80,20 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | FM-6 | An empty text column (e.g. after typing its heading first) takes the type of the first values typed into it. | Done |
 | FM-7 | A **decimal comma** is understood in every notation ("0,5", "12,99", "1.234,56"); with both marks the last one is the decimal mark, and a single mark only counts as thousands grouping when it groups exactly like that and the notation uses the other mark ("1,234" in English, "1.234" in German). | Done |
 
+## 4c. Formulas
+
+| ID | Requirement | Status |
+|---|---|---|
+| FX-1 | A **formula column** computes its value per row from an expression; cells are read-only and results are computed when shown, never stored (only the formula is saved and exported). | Done |
+| FX-2 | Columns are referenced by name in brackets: `[Birthday]`. Renaming a column updates formulas that refer to it. | Done |
+| FX-3 | Operators `+ − * /`, `&` (text), `= <> < > <= >=`; date arithmetic (date − date = days, date ± days = date). | Done |
+| FX-4 | Functions: IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT (English names). Arguments are separated by `,` or `;`; with `;` numbers may use a decimal comma. | Done |
+| FX-5 | **Following links**: `[Employer].[City]`, `SUM([Client].[Employees])`, `COUNT([Lead])`; chains like `[Lead].[Employer].[City]` work; a result that is a set of links shows as link chips. | Done |
+| FX-6 | Errors (unknown column, not a number, self-reference …) show `#ERROR` in the cell with the reason as a tooltip. | Done |
+| FX-7 | Formula editor (Insert → Formula column…, Format → Formula…, column menu, or the toolbar's type list): column shortcuts, live preview of the first rows, error message. | Done |
+| FX-8 | Results take part in display formats (number/date formats of the Format menu), sorting, filtering, the summary row and the status bar. "Convert to values" turns a formula column into a plain column with its current results. | Done |
+| FX-9 | The parser is self-written (no `eval`), so imported files cannot run code. | Done |
+
 ## 4b. Help
 
 | ID | Requirement | Status |
@@ -156,6 +170,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | 2026-10-18 | No separate row numbers: the ID column is the row header. Display settings (minimum rows/columns) are personal and live in the browser, not in the database. |
 | 2026-10-18 | Columns carry an optional display format (date/number). Dates with dots are day.month.year in every locale, since no locale writes month first with dots. |
 | 2026-10-18 | The notation (decimal mark, date order, currency placement) is a personal setting, defaulting to the browser locale; input accepts a decimal comma regardless. |
+| 2026-10-18 | Computed fields are formula columns with spreadsheet-style syntax but column names instead of cell addresses (`[Birthday]`), English function names, and `.` to follow links – the graph-specific part. Results are not stored, so values like an age stay current. |
 | 2026-10-18 | A pasted table only brings its own header row into an empty sheet when it has several columns with text headings, so a pasted list of names keeps its first entry. |
 
 ## 10. Open questions
