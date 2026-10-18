@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useStore } from "../model/store";
-import { columnsOf, instancesOf } from "../model/graph";
 import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
 import { openDatabase } from "../model/persist";
@@ -11,8 +10,10 @@ export function Header() {
   const [open, setOpen] = useState<number | null>(null);
   const s = useStore();
   const { sel } = s;
-  const hasRow = sel.row >= 1 && sel.row - 1 < instancesOf(s.graph, s.activeTypeId).length;
-  const hasCol = sel.col >= 1 && sel.col <= columnsOf(s.graph, s.activeTypeId).length;
+  const m = A.currentSheet();
+  const hasRow = Math.max(sel.row, s.anchor.row) >= 1 && Math.min(sel.row, s.anchor.row) - 1 < m.rows.length;
+  const hasCol = sel.col >= 1 && sel.col <= m.columns.length && m.columns[sel.col - 1].key !== m.type.nameKey;
+  const hiddenCount = m.all.filter((c) => c.hidden).length;
 
   const menus: { label: string; items: MenuItem[] }[] = [
     {
@@ -45,15 +46,15 @@ export function Header() {
         { label: "Copy", shortcut: `${MOD}C`, action: () => A.copySelection() },
         { label: "Paste", shortcut: `${MOD}V`, action: A.pasteFromClipboard },
         "-",
-        { label: "Delete row", disabled: !hasRow, action: () => A.deleteRow(sel.row) },
+        { label: "Delete row(s)", disabled: !hasRow, action: A.deleteRows },
         { label: "Delete column", disabled: !hasCol, action: () => A.deleteColumn(sel.col) },
       ],
     },
     {
       label: "Insert",
       items: [
-        { label: "Row (instance)", action: () => s.select({ row: instancesOf(s.graph, s.activeTypeId).length + 1, col: 0 }) },
-        { label: "Column (property)", action: () => s.select({ row: 0, col: columnsOf(s.graph, s.activeTypeId).length + 1 }) },
+        { label: "Row", action: A.addRow },
+        { label: "Column", action: () => s.select({ row: 0, col: m.columns.length + 1 }) },
         { label: "Sheet (type)", action: A.newSheet },
       ],
     },
@@ -61,7 +62,9 @@ export function Header() {
       label: "View",
       items: [
         { label: "Table", action: () => s.setView("sheet") },
-        { label: "Graph", action: () => s.setView("graph", A.currentSheet().rows[sel.row - 1]?.id ?? null) },
+        { label: "Graph", action: () => s.setView("graph", m.rows[sel.row - 1]?.id ?? null) },
+        "-",
+        { label: hiddenCount ? `Show ${hiddenCount} hidden column${hiddenCount > 1 ? "s" : ""}` : "No hidden columns", disabled: !hiddenCount, action: () => A.unhideColumns() },
       ],
     },
   ];

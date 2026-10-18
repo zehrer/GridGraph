@@ -1,6 +1,7 @@
-/** `autonumber` is read-only: every new instance gets the next number, numbers are never reused. */
-export type ColumnType = "text" | "number" | "date" | "boolean" | "relation" | "autonumber";
+export type ColumnType = "text" | "number" | "date" | "boolean" | "relation";
 export type Value = string | number | boolean;
+/** Aggregate shown in the sheet footer. */
+export type Summary = "sum" | "avg" | "min" | "max" | "count" | "empty";
 
 export interface Column {
   key: string;
@@ -8,8 +9,11 @@ export interface Column {
   type: ColumnType;
   /** For relation columns: the type whose instances can be referenced. */
   targetTypeId?: string;
-  /** For autonumber columns: the number the next instance gets. */
-  next?: number;
+  /** Display options of the sheet. */
+  width?: number;
+  hidden?: boolean;
+  wrap?: boolean;
+  summary?: Summary;
 }
 
 /**
@@ -19,13 +23,20 @@ export interface Column {
  */
 export interface GraphNode {
   id: string;
-  label: string;
+  /** Name of a type. Instances take their name from the type's name column; only untyped (imported) nodes use it. */
+  label?: string;
   isType?: boolean;
   typeId?: string;
   color?: string;
+  // Types only:
   columns?: Column[];
-  /** Types only: header of the name column (defaults to "Name"). */
-  nameLabel?: string;
+  /** Key of the column that names the instances (graph labels, link matching). */
+  nameKey?: string;
+  /** Running number the next instance gets; numbers are never reused. */
+  nextNo?: number;
+  // Instances only:
+  /** ID shown in the sheet: running number per type, assigned on creation. */
+  no?: number;
   props: Record<string, Value>;
 }
 

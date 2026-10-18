@@ -27,22 +27,23 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | DM-2 | A **type** is a node (`isType`) that owns an ordered list of columns (key, label, data type). | Done |
 | DM-3 | An **instance** is a node whose `typeId` points to its type. The `typeOf` edge is derived from `typeId`, not stored. | Done |
 | DM-4 | Instances hold properties as key → value (text, number, ISO date, boolean, node id). | Done |
-| DM-5 | Column data types: Text, Number, Date, Yes/No, **Link to type** (relation), **Auto number**. | Done |
+| DM-5 | Column data types: Text, Number, Date, Yes/No, **Link to type** (relation). | Done |
 | DM-6 | A relation property stores the id of the target node; the edge (labelled with the column name) is derived from it. | Done |
 | DM-7 | **Free edges** (any node → any node, with a relation name) are stored separately. | Done |
 | DM-8 | Properties that no column declares appear as extra columns, with a data type inferred from the value. | Done |
 | DM-9 | Deleting a type deletes its instances; references to deleted nodes are removed; relation columns pointing to a deleted type become text. | Done |
-| DM-10 | Every node has an internal, immutable unique id; links refer to it, so renaming never breaks a link. Row numbers in the sheet are positions, not ids. | Done |
-| DM-11 | **Auto number** column (optional, per type): read-only running number assigned when an instance is created; numbers are never reused after a delete. Converting a column to Auto number numbers the existing instances in creation order (after confirmation if it has values). | Done |
+| DM-10 | Every node has an internal, immutable unique id; links refer to it, so renaming never breaks a link. | Done |
+| DM-11 | Every instance gets a visible **ID**: a running number per type, assigned on creation and never reused after a delete. | Done |
+| DM-12 | Each type has one **name column** (any column except links). Its values name the instances in links, the graph and the inspector. | Done |
 
 ## 4. Table view (sheet)
 
 | ID | Requirement | Status |
 |---|---|---|
 | SH-1 | One **sheet tab per type** at the bottom: add (+), list all (≡), rename (double-click), color, delete. | Done |
-| SH-2 | The **header row** (row "0", sticky) shows the property names; there are no A/B/C column letters. Typing a name into an empty header cell creates a column. | Done |
-| SH-3 | Column 1 is the instance's **name** (primary field: graph label, link matching, search). Its header can be renamed per type (default "Name"); pasting a header row renames it too. | Done |
-| SH-3a | Rows 1… are instances. At least 20 rows and 6 columns are shown; "Add N more rows at the bottom" adds empty rows. | Done |
+| SH-2 | The **header row** (sticky) shows the property names; there are no A/B/C column letters. Typing a name into an empty header cell creates a column. | Done |
+| SH-3 | The first column is the read-only **ID**; rows are sorted by ID unless the user sorts by a column. | Done |
+| SH-3a | The **name column** is marked (◆, blue header) but can sit anywhere; any column can be made the name column from the column menu. It cannot be deleted. | Done |
 | SH-4 | Typing into an empty row creates an instance; typing into an empty column creates a property. | Done |
 | SH-5 | Editing: start typing, Enter, F2 or double-click; Enter/Tab confirm and move; Esc cancels; Delete/Backspace clears. | Done |
 | SH-6 | Arrow keys, Tab and Enter move the active cell. | Done |
@@ -52,9 +53,15 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | SH-10 | Yes/No cells show a checkbox that toggles on click. | Done |
 | SH-11 | Toolbar: undo, redo, column data type, sort ascending/descending by the active column, search filter, Table/Graph switch. | Done |
 | SH-12 | Changing a column's data type converts existing values (relations by name). | Done |
-| SH-13 | Resize columns by dragging the header border. | Planned |
-| SH-14 | Reorder columns and rows by drag and drop. | Idea |
-| SH-15 | Context menu (right click) on cells, row numbers and headers. | Idea |
+| SH-13 | **Resize** columns by dragging the header border; widths are saved per column. | Done |
+| SH-14 | **Reorder** columns by dragging the header, or Move left/right in the column menu. | Done |
+| SH-15 | **Column menu** (▾ on the header, or right click): sort, move, wrap text, use as name column, hide, delete. | Done |
+| SH-16 | **Hide / show** columns: hidden columns leave a ⋮ marker in the header to show them again; View → Show hidden columns shows all. | Done |
+| SH-17 | **Wrap text** per column; wrapped rows grow in height. | Done |
+| SH-18 | **Add row** (toolbar, Insert menu, context menu) appends an instance and selects its name cell; **Delete row(s)** removes the selected rows. Clicking a row number selects the row. | Done |
+| SH-19 | **Footer row** (sticky): row count under the ID; per column a choice of None, Sum, Average, Min, Max, Count, Empty (Min/Max also for dates). | Done |
+| SH-20 | Context menu (right click) on cells and row numbers: add/delete rows, cut, copy, paste. | Done |
+| SH-21 | Reorder rows by drag and drop (manual order instead of ID order). | Idea |
 
 ## 5. Copy and paste
 
@@ -119,10 +126,12 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | 2026-10-18 | Copy/paste via TSV + HTML table for compatibility with Numbers and Google Sheets. |
 | 2026-10-18 | Multiple databases per browser, each with a name; the File menu lists them. |
 | 2026-10-18 | UI language is English only; number and date notation follows the browser locale. |
-| 2026-10-18 | No mandatory ID column: internal ids already guarantee uniqueness. A visible running number is an optional "Auto number" column type. The name column stays the primary field but can be renamed. |
+| 2026-10-18 | The ID is built in: every instance gets a running number per type, shown as the first, read-only column (replaces the short-lived "Auto number" column type). |
+| 2026-10-18 | The name is a normal column marked as the name column (`nameKey`), not a fixed first column; older data is migrated on load. |
+| 2026-10-18 | A pasted table only brings its own header row into an empty sheet when it has several columns with text headings, so a pasted list of names keeps its first entry. |
 
 ## 10. Open questions
 
-- Should a sheet support several instances with the same name, or should names be unique per type (relations are matched by name)? An Auto number column gives a readable unique key, but link cells still match by name.
+- Should a sheet support several instances with the same name, or should names be unique per type? Link cells match by name; the ID is unique but not used for matching yet (e.g. typing `#12`).
 - Should column keys stay internal ids, or follow the column name (affects JSON export readability)?
 - Should free edges be editable in the table (e.g. an "edges" sheet)?

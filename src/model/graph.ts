@@ -36,6 +36,15 @@ export function columnsOf(g: Graph, typeId: string): Column[] {
   return cols;
 }
 
+/** Display name: types use their label, instances the value of their type's name column. */
+export function nodeName(g: Graph, n: GraphNode): string {
+  const t = n.typeId ? g.nodes[n.typeId] : undefined;
+  if (!t?.nameKey) return n.label ?? "";
+  const v = n.props[t.nameKey];
+  const col = t.columns?.find((c) => c.key === t.nameKey);
+  return v === undefined ? "" : col && col.type !== "relation" ? rawValue(g, col, v) : String(v);
+}
+
 /** All edges: typeOf (from typeId), relation columns (from props) and free edges. */
 export function edgesOf(g: Graph): DerivedEdge[] {
   const out: DerivedEdge[] = [];
@@ -60,30 +69,22 @@ export function edgesOf(g: Graph): DerivedEdge[] {
 export function addType(g: Graph, label?: string): string {
   const id = newId("type");
   const n = typesOf(g).length;
-  g.nodes[id] = { id, label: label ?? `Type ${n + 1}`, isType: true, color: PALETTE[n % PALETTE.length], columns: [], props: {} };
+  g.nodes[id] = {
+    id, label: label ?? `Type ${n + 1}`, isType: true, color: PALETTE[n % PALETTE.length],
+    columns: [{ key: "name", label: "Name", type: "text" }], nameKey: "name", nextNo: 1, props: {},
+  };
   return id;
 }
 
-export function addInstance(g: Graph, typeId: string, label = ""): string {
+/** Creates an instance with the next ID of its type and, optionally, a name. */
+export function addInstance(g: Graph, typeId: string, name = ""): string {
+  const t = g.nodes[typeId];
   const id = newId("inst");
-  g.nodes[id] = { id, label, typeId, props: {} };
-  for (const col of g.nodes[typeId]?.columns ?? []) {
-    if (col.type === "autonumber") {
-      col.next ??= 1;
-      g.nodes[id].props[col.key] = col.next++;
-    }
-  }
+  g.nodes[id] = { id, typeId, no: (t.nextNo ??= 1), props: {} };
+  t.nextNo++;
+  if (name && t.nameKey) g.nodes[id].props[t.nameKey] = name;
   return id;
 }
-
-/** Turns a column into an autonumber column, numbering existing instances in creation order. */
-export function numberColumn(g: Graph, typeId: string, col: Column) {
-  let next = 1;
-  for (const inst of instancesOf(g, typeId)) inst.props[col.key] = next++;
-  upsertColumn(g, typeId, { key: col.key, label: col.label, type: "autonumber", next });
-}
-
-export const nameLabel = (type: GraphNode | undefined) => type?.nameLabel || "Name";
 
 export function setProp(g: Graph, nodeId: string, key: string, value: Value | undefined) {
   const n = g.nodes[nodeId];
@@ -92,18 +93,36 @@ export function setProp(g: Graph, nodeId: string, key: string, value: Value | un
   else n.props[key] = value;
 }
 
+/** Makes discovered (undeclared) columns part of the type, so they can be moved, hidden or resized. */
+export function declareColumns(g: Graph, typeId: string): Column[] {
+  return (g.nodes[typeId].columns = columnsOf(g, typeId));
+}
+
 export function upsertColumn(g: Graph, typeId: string, col: Column) {
-  const t = g.nodes[typeId];
-  if (!t) return;
-  const cols = (t.columns ??= []);
+  const cols = declareColumns(g, typeId);
   const i = cols.findIndex((c) => c.key === col.key);
   if (i >= 0) cols[i] = col;
   else cols.push(col);
 }
 
+export function patchColumn(g: Graph, typeId: string, key: string, patch: Partial<Column>) {
+  const col = declareColumns(g, typeId).find((c) => c.key === key);
+  if (col) Object.assign(col, patch);
+}
+
+/** Moves a column in front of `beforeKey` (or to the end). */
+export function moveColumn(g: Graph, typeId: string, key: string, beforeKey?: string) {
+  const cols = declareColumns(g, typeId);
+  const from = cols.findIndex((c) => c.key === key);
+  if (from < 0 || key === beforeKey) return;
+  const [col] = cols.splice(from, 1);
+  const to = beforeKey ? cols.findIndex((c) => c.key === beforeKey) : -1;
+  cols.splice(to < 0 ? cols.length : to, 0, col);
+}
+
 export function removeColumn(g: Graph, typeId: string, key: string) {
   const t = g.nodes[typeId];
-  if (t) t.columns = (t.columns ?? []).filter((c) => c.key !== key);
+  if (t) t.columns = declareColumns(g, typeId).filter((c) => c.key !== key);
   for (const inst of instancesOf(g, typeId)) delete inst.props[key];
 }
 
@@ -130,9 +149,38 @@ export function deleteEdge(g: Graph, e: DerivedEdge) {
   else if (e.kind === "column" && e.colKey) setProp(g, e.source, e.colKey, undefined);
 }
 
+/**
+ * Brings older data into the current shape (in place): every type gets a name column
+ * (instance labels move into it) and every instance a running ID. Idempotent.
+ */
+export function normalize(g: Graph): Graph {
+  for (const t of typesOf(g) as (GraphNode & { nameLabel?: string })[]) {
+    // Auto-number columns (v0.4) became the built-in ID; keep their values as plain numbers.
+    t.columns = ((t.columns ?? []) as (Column & { next?: number })[]).map(({ next: _, ...c }) =>
+      (c.type as string) === "autonumber" ? { ...c, type: "number" as const } : c,
+    );
+    const insts = instancesOf(g, t.id);
+    if (!t.nameKey) {
+      const taken = t.columns.some((c) => c.key === "name") || insts.some((i) => "name" in i.props);
+      const key = taken ? newId("c") : "name";
+      t.columns.unshift({ key, label: t.nameLabel || "Name", type: "text" });
+      t.nameKey = key;
+      for (const i of insts) {
+        if (i.label) i.props[key] = i.label;
+        delete i.label;
+      }
+    }
+    delete t.nameLabel;
+    let next = Math.max(t.nextNo ?? 1, ...insts.map((i) => (i.no ?? 0) + 1));
+    for (const i of insts) i.no ??= next++;
+    t.nextNo = next;
+  }
+  return g;
+}
+
 // --- Cell values ---
 
-/** Parses user input for a column; relation input is matched (or created) by label. */
+/** Parses user input for a column; relation input is matched (or created) by name. */
 export function parseValue(g: Graph, col: Column, raw: string): Value | undefined {
   const s = raw.trim();
   if (!s) return undefined;
@@ -145,7 +193,7 @@ export function parseValue(g: Graph, col: Column, raw: string): Value | undefine
       return parseDate(s) ?? s;
     case "relation": {
       if (!col.targetTypeId || !g.nodes[col.targetTypeId]) return s;
-      const hit = instancesOf(g, col.targetTypeId).find((n) => n.label.toLowerCase() === s.toLowerCase());
+      const hit = instancesOf(g, col.targetTypeId).find((n) => nodeName(g, n).toLowerCase() === s.toLowerCase());
       return hit?.id ?? addInstance(g, col.targetTypeId, s);
     }
     default:
@@ -169,7 +217,7 @@ export function guessType(values: string[]): ColumnType {
  */
 export function rawValue(g: Graph, col: Column, v: Value | undefined): string {
   if (v === undefined) return "";
-  if (col.type === "relation" && typeof v === "string") return g.nodes[v]?.label ?? v;
+  if (col.type === "relation" && typeof v === "string") return g.nodes[v] ? nodeName(g, g.nodes[v]) : v;
   if (col.type === "boolean") return formatBoolean(!!v);
   if (col.type === "number" && typeof v === "number") return formatNumber(v);
   if (col.type === "date" && typeof v === "string") return formatDate(v);

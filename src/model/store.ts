@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { addType, emptyGraph, newId, typesOf } from "./graph";
+import { addType, emptyGraph, newId, normalize, typesOf } from "./graph";
 import type { Graph } from "./types";
 
 /** A database saved in this browser. */
@@ -96,7 +96,7 @@ export const useStore = create<State>()((set, get) => {
     },
     open: (g, db, dirty = false) =>
       set({
-        graph: g, db, past: [], future: [], view: "sheet", activeTypeId: settle(g, ""),
+        graph: normalize(g), db, past: [], future: [], view: "sheet", activeTypeId: settle(g, ""),
         sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "",
         savedAt: dirty ? null : new Date(db.updatedAt), revision: get().revision + (dirty ? 1 : 0),
       }),

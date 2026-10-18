@@ -1,29 +1,40 @@
-import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import { rangeOf, useStore, type Cell } from "../model/store";
-import { displayValue, nameLabel, nodeColor } from "../model/graph";
+import { displayValue, nodeColor, nodeName } from "../model/graph";
 import { parseClipboard, toHTML, toTSV } from "../model/clipboard";
+import { SUMMARIES, summarize } from "../model/summary";
 import type { Column, Graph, GraphNode } from "../model/types";
-import { cellText, clearSelection, commitCell, pasteMatrix, selectionMatrix, sheetModel, type SheetModel } from "./actions";
+import * as A from "./actions";
+import { MenuList, type MenuItem } from "./Menu";
 
-const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗", autonumber: "№" };
-const isNumeric = (c?: Column) => c?.type === "number" || c?.type === "autonumber";
+const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗" };
 const MOVES: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+const ROW_HEAD = 46;
+const ID_WIDTH = 56;
+const DEFAULT_WIDTH = 120;
 
 interface Edit { cell: Cell; text: string; inBar?: boolean }
 type CellHandler = (e: MouseEvent, cell: Cell) => void;
+type Popup = { x: number; y: number; up?: boolean; items: MenuItem[] };
 
 export function Sheet() {
   const { graph, activeTypeId, sort, filter, sel, anchor, select } = useStore();
-  const m = useMemo(() => sheetModel(graph, activeTypeId, { sort, filter }), [graph, activeTypeId, sort, filter]);
+  const m = useMemo(() => A.sheetModel(graph, activeTypeId, { sort, filter }), [graph, activeTypeId, sort, filter]);
   const [edit, setEditState] = useState<Edit | null>(null);
   const editRef = useRef<Edit | null>(null);
   const [extraRows, setExtraRows] = useState(0);
   const [addCount, setAddCount] = useState("1000");
+  const [popup, setPopup] = useState<Popup | null>(null);
+  const [resize, setResize] = useState<{ key: string; width: number } | null>(null);
+  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const nRows = Math.max(m.rows.length + 1, 20) + extraRows;
   const nCols = Math.max(m.columns.length + 2, 6);
   const range = rangeOf(anchor, sel);
+  const multi = range.r0 !== range.r1 || range.c0 !== range.c1;
+  const widthOf = (c?: Column) => (c && resize?.key === c.key ? resize.width : (c?.width ?? DEFAULT_WIDTH));
+  const widths = [ID_WIDTH, ...Array.from({ length: nCols - 1 }, (_, i) => widthOf(m.columns[i]))];
   const setEdit = (e: Edit | null) => setEditState((editRef.current = e));
   const move = (dr: number, dc: number, from = useStore.getState().sel, extend = false) =>
     select({ row: Math.min(from.row + dr, nRows), col: Math.min(from.col + dc, nCols - 1) }, extend);
@@ -36,28 +47,36 @@ export function Sheet() {
     const e = editRef.current;
     if (!e) return;
     setEdit(null);
-    if (save) commitCell(e.cell, e.text);
+    if (save) A.commitCell(e.cell, e.text);
     if (delta) {
       move(delta[0], delta[1], e.cell);
       gridRef.current?.focus();
     }
   };
 
-  // Stable handler for memoized rows; reads the latest state through the ref.
+  // Stable handlers for memoized rows; they read the latest state through the ref.
   const latest = useRef({ m, graph });
   latest.current = { m, graph };
   const dragging = useRef(false);
   const onCell = useRef<CellHandler>((e, cell) => {
     const { m, graph } = latest.current;
     const { select } = useStore.getState();
-    if (e.type === "dblclick") return !readOnly(m, cell) && setEdit({ cell, text: cellText(graph, m, cell) });
+    if (e.type === "dblclick") return !A.readOnly(cell) && setEdit({ cell, text: A.cellText(graph, m, cell) });
     if (e.type === "mouseenter") return dragging.current && select(cell, true);
+    if (e.button !== 0) return;
     dragging.current = true;
     select(cell, e.shiftKey);
     const column = m.columns[cell.col - 1];
     if ((e.target as HTMLElement).tagName === "INPUT" && column?.type === "boolean") {
-      commitCell(cell, String(m.rows[cell.row - 1]?.props[column.key] !== true));
+      A.commitCell(cell, String(m.rows[cell.row - 1]?.props[column.key] !== true));
     }
+  }).current;
+  /** Clicking a row number selects the whole row. */
+  const onRowHead = useRef((e: MouseEvent, row: number) => {
+    if (e.button !== 0) return;
+    const { select } = useStore.getState();
+    select({ row, col: 0 }, e.shiftKey);
+    select({ row, col: Math.max(latest.current.m.columns.length, 1) }, true);
   }).current;
 
   useEffect(() => {
@@ -67,16 +86,16 @@ export function Sheet() {
     const copy = (e: ClipboardEvent, cut = false) => {
       if (!active()) return;
       e.preventDefault();
-      const matrix = selectionMatrix();
+      const matrix = A.selectionMatrix();
       e.clipboardData?.setData("text/plain", toTSV(matrix));
       e.clipboardData?.setData("text/html", toHTML(matrix));
-      if (cut) clearSelection();
+      if (cut) A.clearSelection();
     };
     const cut = (e: ClipboardEvent) => copy(e, true);
     const paste = (e: ClipboardEvent) => {
       if (!active() || !e.clipboardData) return;
       e.preventDefault();
-      pasteMatrix(parseClipboard(e.clipboardData.getData("text/html"), e.clipboardData.getData("text/plain")));
+      A.pasteMatrix(parseClipboard(e.clipboardData.getData("text/html"), e.clipboardData.getData("text/plain")));
     };
     window.addEventListener("mouseup", up);
     document.addEventListener("copy", copy);
@@ -103,14 +122,14 @@ export function Sheet() {
     if (delta) {
       e.preventDefault();
       move(delta[0], delta[1], sel, e.shiftKey && e.key in MOVES);
-    } else if (readOnly(m, sel) && e.key.length === 1) {
+    } else if (A.readOnly(sel) && e.key.length === 1) {
       e.preventDefault();
-    } else if ((e.key === "Enter" || e.key === "F2") && !readOnly(m, sel)) {
+    } else if ((e.key === "Enter" || e.key === "F2") && !A.readOnly(sel)) {
       e.preventDefault();
       select(sel);
-      setEdit({ cell: sel, text: cellText(graph, m, sel) });
+      setEdit({ cell: sel, text: A.cellText(graph, m, sel) });
     } else if (e.key === "Backspace" || e.key === "Delete") {
-      clearSelection();
+      A.clearSelection();
     } else if (e.key.length === 1) {
       e.preventDefault();
       select(sel);
@@ -126,6 +145,87 @@ export function Sheet() {
     e.preventDefault();
   };
 
+  // --- Menus ---
+
+  const columnMenu = (col: number): MenuItem[] => {
+    const c = m.columns[col - 1];
+    if (!c) return [];
+    const isName = c.key === m.type.nameKey;
+    return [
+      { label: "Sort A → Z", action: () => A.sortBy(col, true) },
+      { label: "Sort Z → A", action: () => A.sortBy(col, false) },
+      "-",
+      { label: "Move left", disabled: col <= 1, action: () => A.moveColumnTo(col, col - 1) },
+      { label: "Move right", disabled: col >= m.columns.length, action: () => A.moveColumnTo(col, col + 1) },
+      { label: `${c.wrap ? "✓ " : ""}Wrap text`, action: () => A.toggleWrap(col) },
+      { label: isName ? "✓ Name column" : "Use as name column", disabled: isName || c.type === "relation", action: () => A.setNameColumn(col) },
+      "-",
+      { label: "Hide column", action: () => A.hideColumn(col) },
+      { label: "Delete column", disabled: isName, action: () => A.deleteColumn(col) },
+    ];
+  };
+  const rowMenu = (): MenuItem[] => {
+    const { anchor, sel } = useStore.getState();
+    const r = rangeOf(anchor, sel);
+    const n = m.rows.slice(Math.max(r.r0, 1) - 1, r.r1).length;
+    return [
+      { label: "Add row", action: A.addRow },
+      { label: n > 1 ? `Delete ${n} rows` : "Delete row", disabled: !n, action: A.deleteRows },
+      "-",
+      { label: "Cut", action: () => A.copySelection(true) },
+      { label: "Copy", action: () => A.copySelection() },
+      { label: "Paste", action: A.pasteFromClipboard },
+    ];
+  };
+  const openAt = (el: Element, items: MenuItem[], up = false) => {
+    const r = el.getBoundingClientRect();
+    setPopup({ x: r.left, y: up ? r.top : r.bottom, up, items });
+  };
+  const onContextMenu = (e: MouseEvent) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cell], [data-row]");
+    if (!el) return;
+    e.preventDefault();
+    const [row, col] = el.dataset.cell ? el.dataset.cell.split(":").map(Number) : [Number(el.dataset.row), 0];
+    if (!(row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1)) select({ row, col });
+    const items = row === 0 ? columnMenu(col) : rowMenu();
+    if (items.length) setPopup({ x: e.clientX, y: e.clientY, items });
+  };
+
+  // --- Column resize ---
+
+  const startResize = (e: PointerEvent, c: Column) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const [startX, startW, el] = [e.clientX, widthOf(c), e.currentTarget as HTMLElement];
+    const w = (x: number) => Math.max(40, startW + x - startX);
+    const onMove = (ev: globalThis.PointerEvent) => setResize({ key: c.key, width: w(ev.clientX) });
+    const onUp = (ev: globalThis.PointerEvent) => {
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onUp);
+      setResize(null);
+      if (w(ev.clientX) !== startW) A.setColumnWidth(c.key, w(ev.clientX));
+    };
+    el.setPointerCapture(e.pointerId);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+  };
+
+  /** Hidden columns that sit in front of each grid column, for the "show" markers. */
+  const hiddenBefore = new Map<number, Column[]>();
+  let pending: Column[] = [];
+  let visible = 0;
+  for (const c of m.all) {
+    if (c.hidden) pending.push(c);
+    else {
+      visible++;
+      if (pending.length) hiddenBefore.set(visible, pending);
+      pending = [];
+    }
+  }
+  if (pending.length) hiddenBefore.set(visible + 1, pending);
+
+  // --- Rendering ---
+
   const editColumn = edit ? m.columns[edit.cell.col - 1] : undefined;
   const editor = edit && !edit.inBar && (
     <input
@@ -139,25 +239,92 @@ export function Sheet() {
     />
   );
   const target = editColumn?.type === "relation" && editColumn.targetTypeId;
+  const inRange = (row: number, col: number) => multi && row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1;
+
+  const headerCell = (col: number) => {
+    const c = m.columns[col - 1];
+    const hidden = hiddenBefore.get(col);
+    const isName = !!c && c.key === m.type.nameKey;
+    const drop = drag && c && drag.over === col && drag.from !== col ? (drag.from < col ? "drop-after" : "drop-before") : "";
+    const cls = [sel.row === 0 && sel.col === col && "sel", inRange(0, col) && "in-range", col === sel.col && "hl", isName && "name-col", c?.wrap && "wrap", drop];
+    return (
+      <td
+        key={col}
+        data-cell={`0:${col}`}
+        className={cls.filter(Boolean).join(" ")}
+        draggable={!!c && !edit}
+        onMouseDown={(e) => onCell(e, { row: 0, col })}
+        onMouseEnter={(e) => onCell(e, { row: 0, col })}
+        onDoubleClick={(e) => onCell(e, { row: 0, col })}
+        onDragStart={(e) => {
+          dragging.current = false;
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", c?.label ?? "");
+          setDrag({ from: col, over: col });
+        }}
+        onDragOver={(e) => {
+          if (!drag || !c) return;
+          e.preventDefault();
+          if (drag.over !== col) setDrag({ ...drag, over: col });
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (drag) A.moveColumnTo(drag.from, col);
+          setDrag(null);
+        }}
+        onDragEnd={() => setDrag(null)}
+      >
+        {hidden && (
+          <button className="unhide" title={`Show hidden: ${hidden.map((h) => h.label).join(", ")}`} onMouseDown={(e) => e.stopPropagation()} onClick={() => A.unhideColumns(hidden.map((h) => h.key))}>
+            ⋮
+          </button>
+        )}
+        {edit?.cell.row === 0 && edit.cell.col === col ? (editor || edit.text) : col === 0 ? "ID" : c && (
+          <>
+            {isName ? <i className="type-icon name-mark" title="Name column – names the rows in links and in the graph">◆</i> : TYPE_ICON[c.type] && <i className="type-icon">{TYPE_ICON[c.type]}</i>}
+            {c.label}
+          </>
+        )}
+        {c && (
+          <>
+            <button className="col-menu" title="Column menu" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => openAt(e.currentTarget, columnMenu(col))}>▾</button>
+            <span className="resizer" title="Drag to resize" onPointerDown={(e) => startResize(e, c)} onMouseDown={(e) => e.stopPropagation()} />
+          </>
+        )}
+      </td>
+    );
+  };
+
+  const footerCell = (col: number) => {
+    const c = m.columns[col - 1];
+    if (!c) return <td key={col} />;
+    const items: MenuItem[] = [
+      { label: `${c.summary ? "" : "✓ "}None`, action: () => A.setSummary(col, undefined) },
+      ...SUMMARIES.map(([k, l]): MenuItem => ({ label: `${c.summary === k ? "✓ " : ""}${l}`, action: () => A.setSummary(col, k) })),
+    ];
+    return (
+      <td key={col} className="summary" title="Choose what to show for this column" onClick={(e) => openAt(e.currentTarget, items, true)}>
+        {c.summary ? summarize(graph, c, m.rows, c.summary) : <span className="summary-hint">▾</span>}
+      </td>
+    );
+  };
 
   const rowProps = (row: number) => ({
     row,
-    node: row > 0 ? m.rows[row - 1] : undefined,
-    type: m.type,
+    node: m.rows[row - 1],
     columns: m.columns,
     nCols,
     graph,
     selCol: sel.row === row ? sel.col : -1,
-    hlCol: row === 0 ? sel.col : -1,
-    rangeCols: row >= range.r0 && row <= range.r1 && (range.r0 !== range.r1 || range.c0 !== range.c1) ? `${range.c0}:${range.c1}` : "",
+    rangeCols: multi && row >= range.r0 && row <= range.r1 ? `${range.c0}:${range.c1}` : "",
     editCol: edit?.cell.row === row ? edit.cell.col : -1,
     editText: edit?.cell.row === row ? edit.text : undefined,
     editor: edit?.cell.row === row ? editor : null,
     onCell,
+    onRowHead,
   });
 
-  const title = sel.col === 0 ? nameLabel(m.type) : (m.columns[sel.col - 1]?.label ?? "new column");
-  const multi = range.r0 !== range.r1 || range.c0 !== range.c1;
+  const title = sel.col === 0 ? "ID" : (m.columns[sel.col - 1]?.label ?? "new column");
 
   return (
     <div className="sheet">
@@ -167,24 +334,38 @@ export function Sheet() {
         </div>
         <span className="fx">fx</span>
         <input
-          value={edit ? edit.text : cellText(graph, m, sel)}
-          readOnly={readOnly(m, sel)}
+          value={edit ? edit.text : A.cellText(graph, m, sel)}
+          readOnly={A.readOnly(sel)}
           onChange={(e) => setEdit({ cell: edit?.cell ?? sel, text: e.target.value, inBar: true })}
           onKeyDown={onEditorKey}
           onBlur={() => editRef.current?.inBar && finish(true)}
         />
       </div>
 
-      <div className="grid-scroll" ref={gridRef} tabIndex={0} onKeyDown={onGridKey}>
-        <table className="grid">
+      <div className="grid-scroll" ref={gridRef} tabIndex={0} onKeyDown={onGridKey} onContextMenu={onContextMenu}>
+        <table className="grid" style={{ width: ROW_HEAD + widths.reduce((a, b) => a + b, 0) }}>
+          <colgroup>
+            <col style={{ width: ROW_HEAD }} />
+            {widths.map((w, i) => <col key={i} style={{ width: w }} />)}
+          </colgroup>
           <thead>
-            <Row {...rowProps(0)} />
+            <tr>
+              <th className="corner" />
+              {Array.from({ length: nCols }, (_, col) => headerCell(col))}
+            </tr>
           </thead>
           <tbody>
             {Array.from({ length: nRows }, (_, i) => (
               <Row key={i + 1} {...rowProps(i + 1)} />
             ))}
           </tbody>
+          <tfoot>
+            <tr>
+              <th />
+              <td className="id" title="Rows">{m.rows.length}</td>
+              {Array.from({ length: nCols - 1 }, (_, i) => footerCell(i + 1))}
+            </tr>
+          </tfoot>
         </table>
         <div className="add-rows">
           <button onClick={() => setExtraRows(extraRows + (parseInt(addCount) || 0))}>Add</button>
@@ -193,10 +374,11 @@ export function Sheet() {
         </div>
         {target && (
           <datalist id="relation-options">
-            {Object.values(graph.nodes).filter((n) => n.typeId === target).map((n) => <option key={n.id} value={n.label} />)}
+            {Object.values(graph.nodes).filter((n) => n.typeId === target).map((n) => <option key={n.id} value={nodeName(graph, n)} />)}
           </datalist>
         )}
       </div>
+      {popup && <MenuList items={popup.items} at={popup} up={popup.up} onClose={() => setPopup(null)} />}
     </div>
   );
 }
@@ -204,31 +386,29 @@ export function Sheet() {
 interface RowProps {
   row: number;
   node?: GraphNode;
-  type: GraphNode;
   columns: Column[];
   nCols: number;
   graph: Graph;
   selCol: number;
-  /** Header row only: column of the active cell, highlighted. */
-  hlCol: number;
   /** "c0:c1" when this row lies in a multi-cell selection (a string keeps memo comparisons cheap). */
   rangeCols: string;
   editCol: number;
   editText?: string;
   editor: React.ReactNode;
   onCell: CellHandler;
+  onRowHead: (e: MouseEvent, row: number) => void;
 }
 
-/** One sheet row; row 0 is the header with the property names. */
-const Row = memo(function Row({ row, node, type, columns, nCols, graph, selCol, hlCol, rangeCols, editCol, editText, editor, onCell }: RowProps) {
+/** One instance row; column 0 is its ID. */
+const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, rangeCols, editCol, editText, editor, onCell, onRowHead }: RowProps) {
   const [c0, c1] = rangeCols ? rangeCols.split(":").map(Number) : [-1, -1];
   return (
-    <tr className={row === 0 ? "header-row" : ""}>
-      <th className={row === 0 ? "corner" : selCol >= 0 || c0 >= 0 ? "hl" : ""}>{row || ""}</th>
+    <tr>
+      <th data-row={row} className={selCol >= 0 || c0 >= 0 ? "hl" : ""} onMouseDown={(e) => onRowHead(e, row)}>{row}</th>
       {Array.from({ length: nCols }, (_, col) => {
         const column = columns[col - 1];
         const cell = { row, col };
-        const cls = [col === selCol && "sel", col >= c0 && col <= c1 && "in-range", col === hlCol && "hl", isNumeric(column) && row > 0 && "num"];
+        const cls = [col === 0 && "id", col === selCol && "sel", col >= c0 && col <= c1 && "in-range", column?.type === "number" && "num", column?.wrap && "wrap"];
         return (
           <td
             key={col}
@@ -238,7 +418,7 @@ const Row = memo(function Row({ row, node, type, columns, nCols, graph, selCol, 
             onMouseEnter={(e) => onCell(e, cell)}
             onDoubleClick={(e) => onCell(e, cell)}
           >
-            {col === editCol ? (editor ?? editText) : <CellContent row={row} col={col} node={node} column={column} graph={graph} type={type} />}
+            {col === editCol ? (editor || editText) : <CellContent col={col} node={node} column={column} graph={graph} />}
           </td>
         );
       })}
@@ -246,21 +426,14 @@ const Row = memo(function Row({ row, node, type, columns, nCols, graph, selCol, 
   );
 });
 
-/** Auto numbers are assigned by the app and cannot be typed over. */
-const readOnly = (m: SheetModel, cell: Cell) => cell.row > 0 && m.columns[cell.col - 1]?.type === "autonumber";
-
-function CellContent({ row, col, node, column, graph, type }: { row: number; col: number; node?: GraphNode; column?: Column; graph: Graph; type?: GraphNode }) {
-  if (row === 0) {
-    if (col === 0) return <>{nameLabel(type)}</>;
-    return column ? <>{TYPE_ICON[column.type] && <i className="type-icon">{TYPE_ICON[column.type]}</i>}{column.label}</> : null;
-  }
+function CellContent({ col, node, column, graph }: { col: number; node?: GraphNode; column?: Column; graph: Graph }) {
   if (!node) return null;
-  if (col === 0) return <>{node.label}</>;
+  if (col === 0) return <>{node.no}</>;
   const v = column && node.props[column.key];
   if (!column || v === undefined) return null;
   if (column.type === "boolean") return <input type="checkbox" checked={!!v} readOnly tabIndex={-1} />;
   if (column.type === "relation" && typeof v === "string" && graph.nodes[v]) {
-    return <span className="chip"><i style={{ background: nodeColor(graph, graph.nodes[v]) }} />{graph.nodes[v].label}</span>;
+    return <span className="chip"><i style={{ background: nodeColor(graph, graph.nodes[v]) }} />{nodeName(graph, graph.nodes[v])}</span>;
   }
   return <>{displayValue(graph, column, v)}</>;
 }

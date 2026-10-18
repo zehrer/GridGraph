@@ -14,7 +14,7 @@ describe("graph model", () => {
 
   it("discovers schemaless properties as extra columns", () => {
     const keys = columnsOf(sampleGraph(), "type_person").map((c) => c.key);
-    expect(keys).toEqual(["age", "birthday", "isRemote", "company", "hobbies", "certificates"]);
+    expect(keys).toEqual(["name", "age", "birthday", "isRemote", "company", "hobbies", "certificates"]);
   });
 
   it("deleting a type removes its instances and dangling references", () => {
@@ -52,7 +52,7 @@ describe("graph model", () => {
     const rel = { key: "r", label: "r", type: "relation" as const, targetTypeId: t };
     expect(parseValue(g, rel, "acme")).toBe(acme);
     const created = parseValue(g, rel, "Neu GmbH") as string;
-    expect(g.nodes[created]).toMatchObject({ label: "Neu GmbH", typeId: t });
+    expect(g.nodes[created]).toMatchObject({ props: { name: "Neu GmbH" }, typeId: t, no: 2 });
   });
 
   it("upsertColumn renames in place", () => {
@@ -60,7 +60,7 @@ describe("graph model", () => {
     const t = addType(g);
     upsertColumn(g, t, { key: "a", label: "A", type: "text" });
     upsertColumn(g, t, { key: "a", label: "Alpha", type: "text" });
-    expect(g.nodes[t].columns).toEqual([{ key: "a", label: "Alpha", type: "text" }]);
+    expect(g.nodes[t].columns).toEqual([{ key: "name", label: "Name", type: "text" }, { key: "a", label: "Alpha", type: "text" }]);
   });
 });
 
@@ -89,8 +89,9 @@ describe("import / export", () => {
       ],
     };
     const g = fromJSON(JSON.stringify(v1));
-    expect(g.nodes.b.typeId).toBe("t");
-    expect(g.nodes.t.columns).toEqual([{ key: "boss", label: "Chef", type: "relation", targetTypeId: "t" }]);
+    expect(g.nodes.b).toMatchObject({ typeId: "t", no: 2, props: { name: "Bob" } });
+    expect(g.nodes.a.label).toBeUndefined();
+    expect(g.nodes.t.columns).toEqual([{ key: "name", label: "Name", type: "text" }, { key: "boss", label: "Chef", type: "relation", targetTypeId: "t" }]);
     expect(Object.values(g.edges)).toEqual([{ id: "e4", source: "b", target: "a", relation: "knows" }]);
   });
 

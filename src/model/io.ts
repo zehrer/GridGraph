@@ -1,25 +1,24 @@
-import { edgesOf } from "./graph";
+import { edgesOf, nodeName, normalize } from "./graph";
 import type { Column, Edge, Graph, GraphNode, Value } from "./types";
 
 /** Node shape accepted on import: current format plus the v1 names (properties, typeProperties). */
 type NodeInput = Partial<GraphNode> & { id: string; properties?: Record<string, Value>; typeProperties?: Column[] };
 type EdgeInput = Partial<Edge> & { source: string; target: string; kind?: string };
 
+const defined = <T extends object>(o: T) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
+
 /**
  * Builds a graph from flat node/edge lists. typeOf edges become `typeId`, and edges that
  * merely mirror a relation property are dropped because they are derived again on demand.
+ * Older shapes are migrated by `normalize`.
  */
 function fromParts(nodeList: NodeInput[], edgeList: EdgeInput[]): Graph {
   const g: Graph = { nodes: {}, edges: {} };
-  for (const n of nodeList) {
-    g.nodes[n.id] = {
-      id: n.id,
-      label: n.label ?? n.id,
-      ...(n.isType && { isType: true, columns: (n.columns ?? n.typeProperties ?? []).map(({ key, label, type, targetTypeId, next }) => ({ key, label: label ?? key, type: type ?? "text", ...(targetTypeId && { targetTypeId }), ...(next && { next }) })), ...(n.nameLabel && { nameLabel: n.nameLabel }) }),
-      ...(n.typeId && { typeId: n.typeId }),
-      ...(n.color && { color: n.color }),
-      props: { ...(n.props ?? n.properties) },
-    };
+  for (const { properties, typeProperties, props, columns, ...rest } of nodeList) {
+    const n: GraphNode = { ...defined(rest), props: { ...(props ?? properties) } };
+    if (n.isType) n.columns = (columns ?? typeProperties ?? []).map(({ relationName: _, ...c }: Column & { relationName?: string }) => ({ ...c, label: c.label ?? c.key, type: c.type ?? "text" }));
+    else delete n.isType;
+    g.nodes[n.id] = n;
   }
   edgeList.forEach((e, i) => {
     const src = g.nodes[e.source];
@@ -31,10 +30,15 @@ function fromParts(nodeList: NodeInput[], edgeList: EdgeInput[]): Graph {
       g.edges[id] = { id, source: e.source, target: e.target, relation };
     }
   });
-  return g;
+  for (const n of Object.values(g.nodes)) {
+    // Instances of a type with a name column are named by it; exported labels are only for other tools.
+    if (n.typeId && g.nodes[n.typeId]?.nameKey) delete n.label;
+    else if (!n.typeId || n.isType) n.label ??= n.id;
+  }
+  return normalize(g);
 }
 
-export const toJSON = (g: Graph) => JSON.stringify({ format: "gridgraph", version: 2, ...g }, null, 2);
+export const toJSON = (g: Graph) => JSON.stringify({ format: "gridgraph", version: 3, ...g }, null, 2);
 
 export function fromJSON(text: string): Graph {
   const data = JSON.parse(text);
@@ -47,18 +51,18 @@ export function fromJSON(text: string): Graph {
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => `&${{ "&": "amp", "<": "lt", ">": "gt", '"': "quot", "'": "apos" }[c]};`);
 
-const NODE_KEYS = ["label", "isType", "typeId", "color", "nameLabel", "columns", "props"] as const;
+const NODE_KEYS = ["label", "isType", "typeId", "no", "color", "nameKey", "nextNo", "columns", "props"] as const;
 const EDGE_KEYS = ["relation", "kind"] as const;
 
 /** GraphML for Gephi, yEd, Cytoscape. All edges (including derived ones) are written out. */
 export function toGraphML(g: Graph): string {
   const data = (k: string, v: unknown) => (v === undefined ? "" : `\n      <data key="${k}">${esc(typeof v === "object" ? JSON.stringify(v) : v)}</data>`);
   const keys = [
-    ...NODE_KEYS.map((k) => `  <key id="${k}" for="node" attr.name="${k}" attr.type="${k === "isType" ? "boolean" : "string"}"/>`),
+    ...NODE_KEYS.map((k) => `  <key id="${k}" for="node" attr.name="${k}" attr.type="${k === "isType" ? "boolean" : k === "no" || k === "nextNo" ? "int" : "string"}"/>`),
     ...EDGE_KEYS.map((k) => `  <key id="${k}" for="edge" attr.name="${k}" attr.type="string"/>`),
   ];
   const nodes = Object.values(g.nodes).map(
-    (n) => `    <node id="${esc(n.id)}">${NODE_KEYS.map((k) => data(k, k === "isType" ? !!n.isType : n[k])).join("")}\n    </node>`,
+    (n) => `    <node id="${esc(n.id)}">${NODE_KEYS.map((k) => data(k, k === "isType" ? !!n.isType : k === "label" ? n.label ?? nodeName(g, n) : n[k])).join("")}\n    </node>`,
   );
   const edges = edgesOf(g).map(
     (e) => `    <edge id="${esc(e.id)}" source="${esc(e.source)}" target="${esc(e.target)}">${data("relation", e.relation)}${data("kind", e.kind)}\n    </edge>`,
@@ -89,8 +93,9 @@ export function fromGraphML(text: string): Graph {
   };
 
   const nodes = [...doc.querySelectorAll("node")].map((el): NodeInput => {
-    const { label, isType, typeId, color, nameLabel, columns, props, ...rest } = readData(el);
-    return { id: el.id, label, isType: isType === "true", typeId, color, nameLabel, columns: json(columns), props: json(props) ?? rest };
+    const { label, isType, typeId, no, color, nameKey, nextNo, columns, props, ...rest } = readData(el);
+    const num = (s?: string) => (s ? Number(s) : undefined);
+    return { id: el.id, label, isType: isType === "true", typeId, no: num(no), color, nameKey, nextNo: num(nextNo), columns: json(columns), props: json(props) ?? rest };
   });
   const edges = [...doc.querySelectorAll("edge")].map((el): EdgeInput => {
     const d = readData(el);

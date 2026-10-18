@@ -83,29 +83,59 @@ main { flex: 1; min-height: 0; display: flex; }
 .formula-bar input { flex: 1; border: 0; outline: 0; padding: 0 10px; height: 100%; }
 
 .grid-scroll { flex: 1; overflow: auto; outline: none; background: var(--bg); }
-.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; background: var(--surface); font-size: 13px; }
+.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; background: var(--surface); font-size: 13px; user-select: none; }
 .grid th, .grid td {
-  height: 21px; width: 100px; max-width: 100px; padding: 0 4px;
+  height: 21px; padding: 0 4px;
   border-right: 1px solid var(--grid); border-bottom: 1px solid var(--grid);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; scroll-margin: 25px 0 0 46px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; scroll-margin: 25px 0 25px 46px;
 }
-.grid tr > :nth-child(2) { width: 160px; max-width: 160px; }
-.grid thead > tr > * {
-  position: sticky; top: 0; z-index: 2; height: 24px; background: var(--head);
-  font-weight: 500; border-bottom: 1px solid #c4c7c5;
-}
-.grid tbody th {
-  position: sticky; left: 0; z-index: 1; width: 46px; min-width: 46px; background: var(--head);
-  color: var(--muted); font-weight: 400; font-size: 11px; text-align: center;
-}
-.grid .corner { left: 0; z-index: 3; width: 46px; min-width: 46px; }
-.grid th.hl, .grid thead td.hl { background: var(--accent-soft); color: #041e49; }
-.grid tbody th.hl { font-weight: 500; }
-.grid { user-select: none; }
 .grid td { cursor: cell; position: relative; }
+.grid td.wrap { white-space: pre-wrap; overflow-wrap: anywhere; text-overflow: clip; vertical-align: top; }
 .grid td.num { text-align: right; }
+.grid td.id { text-align: right; color: var(--muted); background: #fbfbfb; cursor: default; }
 .grid td.in-range { background: #e8f0fe; }
 .grid td.sel { outline: 2px solid #1a73e8; outline-offset: -2px; }
+
+/* Header row with the property names */
+.grid thead > tr > * {
+  position: sticky; top: 0; z-index: 2; height: 25px; background: var(--head);
+  font-weight: 500; border-bottom: 1px solid #c4c7c5; padding-right: 18px;
+}
+.grid thead td.hl { background: var(--accent-soft); color: #041e49; }
+.grid thead td.name-col { color: var(--accent); }
+.grid thead td.drop-before { box-shadow: inset 3px 0 0 #1a73e8; }
+.grid thead td.drop-after { box-shadow: inset -3px 0 0 #1a73e8; }
+.name-mark { color: var(--accent) !important; }
+.col-menu {
+  position: absolute; right: 4px; top: 3px; width: 16px; height: 18px; padding: 0; border: 0; border-radius: 3px;
+  background: none; color: var(--muted); font-size: 11px; opacity: 0;
+}
+.grid thead td:hover .col-menu, .grid thead td.sel .col-menu { opacity: 1; }
+.col-menu:hover { background: rgb(0 0 0 / 8%); }
+.resizer { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 1; }
+.resizer:hover { background: #1a73e8; opacity: 0.5; }
+.unhide {
+  position: absolute; left: -1px; top: 4px; width: 10px; height: 16px; padding: 0; border: 1px solid #c4c7c5;
+  border-radius: 3px; background: var(--surface); color: var(--muted); font-size: 10px; line-height: 1; z-index: 1;
+}
+.unhide:hover { background: var(--accent-soft); }
+
+/* Row numbers */
+.grid tbody th, .grid tfoot th {
+  position: sticky; left: 0; z-index: 1; background: var(--head);
+  color: var(--muted); font-weight: 400; font-size: 11px; text-align: center; cursor: default;
+}
+.grid tbody th.hl { background: var(--accent-soft); color: #041e49; font-weight: 500; }
+.grid .corner { left: 0; z-index: 3; }
+
+/* Footer with column summaries */
+.grid tfoot > tr > * { position: sticky; bottom: 0; z-index: 2; height: 25px; background: var(--head); border-top: 1px solid #c4c7c5; font-size: 12px; }
+.grid tfoot th { z-index: 3; }
+.grid tfoot td.id { text-align: right; }
+.grid tfoot td.summary { cursor: pointer; text-align: right; color: var(--text); }
+.grid tfoot td.summary:hover { background: var(--hover); }
+.summary-hint { color: transparent; }
+.grid tfoot td.summary:hover .summary-hint { color: var(--muted); }
 .type-icon { font-style: normal; color: var(--muted); margin-right: 4px; font-size: 11px; }
 .grid input[type="checkbox"] { margin: 0; vertical-align: middle; accent-color: var(--accent); }
 .chip { display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 10px; background: #f1f3f4; line-height: 17px; }

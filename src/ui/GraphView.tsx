@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../model/store";
-import { addEdge, columnsOf, deleteEdge, deleteNode, displayValue, edgesOf, nodeColor } from "../model/graph";
+import { addEdge, columnsOf, deleteEdge, deleteNode, displayValue, edgesOf, nodeColor, nodeName } from "../model/graph";
 import { showInSheet } from "./actions";
 import { GraphCanvas } from "./graph-canvas";
 
@@ -22,6 +22,7 @@ export function GraphView() {
     canvas.current = c;
     c.setGraph(useStore.getState().graph);
     // Let the layout settle a little, then frame the graph (or the focused node).
+    c.fitOnSettle = !focusNodeId;
     const t = setTimeout(() => (focusNodeId ? c.focus(focusNodeId) : c.fit()), 400);
     return () => (clearTimeout(t), c.dispose());
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -48,13 +49,13 @@ export function GraphView() {
         <aside className="inspector">
           <header>
             <i style={{ background: nodeColor(graph, node) }} />
-            <b>{node.label || "—"}</b>
-            <span>{node.isType ? "Type" : graph.nodes[node.typeId!]?.label}</span>
+            <b>{nodeName(graph, node) || "—"}</b>
+            <span>{node.isType ? "Type" : `${graph.nodes[node.typeId!]?.label ?? ""}${node.no ? ` #${node.no}` : ""}`}</span>
             <button title="Close" onClick={() => (setSelected(null), canvas.current && (canvas.current.selected = null))}>×</button>
           </header>
           {!node.isType && node.typeId && (
             <dl>
-              {columnsOf(graph, node.typeId).filter((c) => node.props[c.key] !== undefined).map((c) => (
+              {columnsOf(graph, node.typeId).filter((c) => c.key !== graph.nodes[node.typeId!].nameKey && node.props[c.key] !== undefined).map((c) => (
                 <div key={c.key}><dt>{c.label}</dt><dd>{displayValue(graph, c, node.props[c.key])}</dd></div>
               ))}
             </dl>
@@ -67,7 +68,7 @@ export function GraphView() {
               return (
                 <li key={e.id}>
                   <span className="rel">{out ? `${e.relation} →` : `← ${e.relation}`}</span>
-                  <a onClick={() => select(other.id)}>{other.label || "—"}</a>
+                  <a onClick={() => select(other.id)}>{nodeName(graph, other) || "—"}</a>
                   {e.kind !== "typeOf" && <button title="Delete edge" onClick={() => edit((g) => deleteEdge(g, e))}>×</button>}
                 </li>
               );
@@ -76,7 +77,7 @@ export function GraphView() {
           <footer>
             <button onClick={() => showInSheet(node.id)}>Open in table</button>
             <button className="danger" onClick={() => {
-              if (confirm(`Delete "${node.label}"?`)) {
+              if (confirm(`Delete "${nodeName(graph, node)}"?`)) {
                 edit((g) => deleteNode(g, node.id));
                 setSelected(null);
               }

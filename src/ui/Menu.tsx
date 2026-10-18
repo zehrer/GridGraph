@@ -2,8 +2,12 @@ import { useEffect, type ReactNode } from "react";
 
 export type MenuItem = { label: string; shortcut?: string; disabled?: boolean; action: () => void } | { heading: string } | "-";
 
-/** Dropdown list with a transparent backdrop that closes it on any outside click. */
-export function MenuList({ items, onClose, children, up }: { items: MenuItem[]; onClose: () => void; children?: ReactNode; up?: boolean }) {
+/**
+ * Dropdown list with a transparent backdrop that closes it on any outside click.
+ * Without `at` it opens below (or with `up` above) its positioned parent; with `at` it opens at a
+ * viewport point, e.g. for context menus.
+ */
+export function MenuList({ items, onClose, children, up, at }: { items: MenuItem[]; onClose: () => void; children?: ReactNode; up?: boolean; at?: { x: number; y: number } }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -14,7 +18,10 @@ export function MenuList({ items, onClose, children, up }: { items: MenuItem[]; 
   return (
     <div className="menu-layer" onClick={stop} onDoubleClick={stop} onMouseDown={stop}>
       <div className="backdrop" onMouseDown={onClose} />
-      <div className={`menu${up ? " up" : ""}`}>
+      <div
+        className={`menu${up ? " up" : ""}`}
+        style={at && { position: "fixed", left: Math.min(at.x, innerWidth - 240), ...(up ? { top: "auto", bottom: innerHeight - at.y } : { top: at.y }) }}
+      >
         {items.map((it, i) =>
           it === "-" ? (
             <hr key={i} />

@@ -1,18 +1,17 @@
 import { useStore } from "../model/store";
-import { columnsOf, typesOf } from "../model/graph";
-import { setColumnType, sortBy } from "./actions";
+import { typesOf } from "../model/graph";
+import { addRow, currentSheet, deleteRows, setColumnType, sortBy } from "./actions";
 
 const TYPES = [
   ["text", "Text"],
   ["number", "Number"],
   ["date", "Date"],
   ["boolean", "Yes / No"],
-  ["autonumber", "Auto number (ID)"],
 ] as const;
 
 export function Toolbar() {
   const s = useStore();
-  const column = s.sel.col >= 1 ? columnsOf(s.graph, s.activeTypeId)[s.sel.col - 1] : undefined;
+  const column = s.sel.col >= 1 ? currentSheet().columns[s.sel.col - 1] : undefined;
   const sheet = s.view === "sheet";
   const typeValue = column ? (column.type === "relation" ? `rel:${column.targetTypeId ?? ""}` : column.type) : "";
 
@@ -20,6 +19,9 @@ export function Toolbar() {
     <div className="toolbar">
       <button title="Undo" disabled={!s.past.length} onClick={s.undo}>↶</button>
       <button title="Redo" disabled={!s.future.length} onClick={s.redo}>↷</button>
+      <span className="sep" />
+      <button title="Add row" disabled={!sheet} onClick={addRow}>＋ Row</button>
+      <button title="Delete selected rows" disabled={!sheet || s.sel.row < 1} onClick={deleteRows}>− Row</button>
       <span className="sep" />
       <select
         title="Data type of the selected column"

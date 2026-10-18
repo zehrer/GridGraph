@@ -21,7 +21,7 @@ export function SheetTabs() {
       <button className="icon" title="Add sheet (type)" onClick={newSheet}>+</button>
       <div className="menu-anchor">
         <button className="icon" title="All sheets" onClick={() => setMenu("list")}>≡</button>
-        {menu === "list" && <MenuList up onClose={() => setMenu(null)} items={types.map((t) => ({ label: t.label, action: () => setActiveType(t.id) }))} />}
+        {menu === "list" && <MenuList up onClose={() => setMenu(null)} items={types.map((t) => ({ label: t.label ?? "", action: () => setActiveType(t.id) }))} />}
       </div>
       {types.map((t) => {
         const active = t.id === activeTypeId && view === "sheet";

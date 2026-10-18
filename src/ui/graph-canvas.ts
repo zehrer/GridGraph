@@ -1,4 +1,4 @@
-import { edgesOf, nodeColor } from "../model/graph";
+import { edgesOf, nodeColor, nodeName } from "../model/graph";
 import type { DerivedEdge, Graph, GraphNode } from "../model/types";
 
 interface Body { x: number; y: number; vx: number; vy: number; pinned?: boolean }
@@ -28,6 +28,8 @@ export class GraphCanvas {
   private pointer = { x: 0, y: 0 };
   private sized = false;
   selected: string | null = null;
+  /** Frame the whole graph once the layout has settled. */
+  fitOnSettle = false;
 
   constructor(private canvas: HTMLCanvasElement, private on: CanvasEvents) {
     this.ctx = canvas.getContext("2d")!;
@@ -88,6 +90,10 @@ export class GraphCanvas {
     this.draw();
     this.alpha *= 0.985;
     this.frame = this.alpha > 0.005 || this.drag ? requestAnimationFrame(this.tick) : 0;
+    if (!this.frame && this.fitOnSettle) {
+      this.fitOnSettle = false;
+      this.fit();
+    }
   };
 
   private step() {
@@ -300,9 +306,10 @@ export class GraphCanvas {
     ctx.textBaseline = "middle";
     ctx.font = `600 13px ${FONT}`;
     ctx.fillStyle = n.isType ? "#fff" : color;
-    ctx.fillText(n.isType ? "T" : (n.label.trim()[0] ?? "?").toUpperCase(), b.x, b.y);
+    const name = nodeName(this.g, n);
+    ctx.fillText(n.isType ? "T" : (name.trim()[0] ?? "?").toUpperCase(), b.x, b.y);
     ctx.font = `${n.isType ? "600 " : ""}12px ${FONT}`;
     ctx.fillStyle = "#202124";
-    ctx.fillText(n.label || "—", b.x, b.y + r + 12);
+    ctx.fillText(name || "—", b.x, b.y + r + 12);
   }
 }
