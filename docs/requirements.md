@@ -109,7 +109,8 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | GR-4 | Click a node to open the inspector (properties, incoming/outgoing edges, delete edge/node). | Done |
 | GR-5 | Double-click a node (or "Open in table") jumps to its row in the sheet. | Done |
 | GR-6 | Layout positions are not saved; the layout is recomputed. | Done (decision) |
-| GR-7 | **Hide type nodes** (◆ button): type nodes and `typeOf` edges are left out of drawing and layout, and a legend lists the types with color and count (click opens the sheet). Remembered per browser. Filtering by type is still an idea. | Done |
+| GR-7 | **Hide type nodes** (◆ button): type nodes and `typeOf` edges are left out of drawing and layout, and a legend lists the types with color and count. Remembered per browser. | Done |
+| GR-8 | Clicking a legend entry **hides or shows that type's nodes** (and their edges) in the graph; hidden entries are dimmed. Kept while switching views, reset when another database opens. | Done |
 
 ## 7. Databases, storage and files
 

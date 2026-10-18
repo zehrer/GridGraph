@@ -23,6 +23,7 @@ export class GraphCanvas {
   private nodes: GraphNode[] = [];
   private edges: DerivedEdge[] = [];
   private showTypes = true;
+  private hiddenTypes = new Set<string>();
   private pan = { x: 0, y: 0 };
   private zoom = 1;
   private alpha = 1;
@@ -69,8 +70,19 @@ export class GraphCanvas {
   }
 
   private refresh() {
-    this.nodes = Object.values(this.g.nodes).filter((n) => this.showTypes || !n.isType);
-    this.edges = edgesOf(this.g).filter((e) => this.showTypes || e.kind !== "typeOf");
+    const hidden = (n: GraphNode) => this.hiddenTypes.has(n.isType ? n.id : (n.typeId ?? ""));
+    this.nodes = Object.values(this.g.nodes).filter((n) => (this.showTypes || !n.isType) && !hidden(n));
+    const shown = new Set(this.nodes.map((n) => n.id));
+    this.edges = edgesOf(this.g).filter((e) => shown.has(e.source) && shown.has(e.target));
+  }
+
+  /** Leaves the nodes of these types (and their edges) out of drawing and layout. */
+  setHiddenTypes(ids: string[]) {
+    const next = new Set(ids);
+    if (next.size === this.hiddenTypes.size && ids.every((id) => this.hiddenTypes.has(id))) return;
+    this.hiddenTypes = next;
+    this.refresh();
+    this.kick();
   }
 
   setShowTypes(show: boolean) {

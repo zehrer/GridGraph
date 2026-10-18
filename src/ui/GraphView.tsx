@@ -7,7 +7,7 @@ import { GraphCanvas } from "./graph-canvas";
 export function GraphView() {
   const ref = useRef<HTMLCanvasElement>(null);
   const canvas = useRef<GraphCanvas | null>(null);
-  const { graph, focusNodeId, edit, prefs, setPrefs } = useStore();
+  const { graph, focusNodeId, edit, prefs, setPrefs, hiddenTypes } = useStore();
   const showTypes = prefs.graphTypes;
   const [selected, setSelected] = useState<string | null>(focusNodeId);
 
@@ -22,6 +22,7 @@ export function GraphView() {
     });
     canvas.current = c;
     c.setShowTypes(useStore.getState().prefs.graphTypes);
+    c.setHiddenTypes(useStore.getState().hiddenTypes);
     c.setGraph(useStore.getState().graph);
     // Let the layout settle a little, then frame the graph (or the focused node).
     c.fitOnSettle = !focusNodeId;
@@ -31,6 +32,9 @@ export function GraphView() {
 
   useEffect(() => canvas.current?.setGraph(graph), [graph]);
   useEffect(() => canvas.current?.setShowTypes(showTypes), [showTypes]);
+  useEffect(() => canvas.current?.setHiddenTypes(hiddenTypes), [hiddenTypes]);
+  const toggleType = (id: string) =>
+    useStore.setState({ hiddenTypes: hiddenTypes.includes(id) ? hiddenTypes.filter((t) => t !== id) : [...hiddenTypes, id] });
 
   const node = selected ? graph.nodes[selected] : undefined;
   const select = (id: string) => {
@@ -52,7 +56,12 @@ export function GraphView() {
       {!showTypes && (
         <div className="graph-legend">
           {typesOf(graph).map((t) => (
-            <button key={t.id} title={`Open "${t.label}" in the table`} onClick={() => showInSheet(t.id)}>
+            <button
+              key={t.id}
+              className={hiddenTypes.includes(t.id) ? "off" : ""}
+              title={`${hiddenTypes.includes(t.id) ? "Show" : "Hide"} ${t.label} in the graph`}
+              onClick={() => toggleType(t.id)}
+            >
               <i style={{ background: t.color }} />
               {t.label}
               <span>{instancesOf(graph, t.id).length}</span>

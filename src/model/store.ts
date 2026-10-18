@@ -54,6 +54,8 @@ interface State {
   sel: Cell;
   anchor: Cell;
   focusNodeId: string | null;
+  /** Types whose nodes the graph leaves out (toggled in the legend; kept for the session). */
+  hiddenTypes: string[];
   /** Where "Back" returns to after following a link. */
   back: { typeId: string; sel: Cell } | null;
   /** Sheet view options; key "" sorts by name. */
@@ -108,6 +110,7 @@ export const useStore = create<State>()((set, get) => {
     anchor: { row: 1, col: 0 },
     focusNodeId: null,
     back: null,
+    hiddenTypes: [],
     sort: null,
     filter: "",
     savedAt: null,
@@ -132,7 +135,7 @@ export const useStore = create<State>()((set, get) => {
     open: (g, db, dirty = false) =>
       set({
         graph: normalize(g), db, past: [], future: [], view: "sheet", activeTypeId: settle(g, ""),
-        sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "",
+        sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "", hiddenTypes: [], back: null,
         savedAt: dirty ? null : new Date(db.updatedAt), revision: get().revision + (dirty ? 1 : 0),
       }),
     rename: (name) => set({ db: { ...get().db, name }, revision: get().revision + 1 }),

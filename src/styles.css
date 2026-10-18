@@ -229,3 +229,5 @@ main { flex: 1; min-height: 0; display: flex; }
 .chip { cursor: pointer; }
 .chip + .chip { margin-left: 4px; }
 .grid td.wrap .chip { margin: 1px 4px 1px 0; }
+.graph-legend button.off { color: var(--muted); text-decoration: line-through; }
+.graph-legend button.off i { opacity: 0.3; }
