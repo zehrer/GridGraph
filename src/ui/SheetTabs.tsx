@@ -3,6 +3,7 @@ import { useStore } from "../model/store";
 import { PALETTE, typesOf } from "../model/graph";
 import { deleteSheet, newSheet } from "./actions";
 import { MenuList } from "./Menu";
+import { SelectionStats } from "./SelectionStats";
 
 /** Bottom sheet tabs: one tab per type, like the sheets of a spreadsheet. */
 export function SheetTabs() {
@@ -67,6 +68,7 @@ export function SheetTabs() {
           </div>
         );
       })}
+      {view === "sheet" && <SelectionStats />}
     </footer>
   );
 }

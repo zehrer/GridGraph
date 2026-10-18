@@ -5,7 +5,7 @@ import { sampleGraph } from "../model/sample";
 import { deleteDatabase, openNew } from "../model/persist";
 import { rangeOf, useStore, type Cell } from "../model/store";
 import { parseClipboard, toHTML, toTSV, type Matrix } from "../model/clipboard";
-import type { Column, Graph, GraphNode, Summary } from "../model/types";
+import type { Column, Graph, GraphNode, Summary, Value } from "../model/types";
 
 export interface SheetModel {
   type: GraphNode;
@@ -128,6 +128,18 @@ export function selectionMatrix(): Matrix {
   const m = currentSheet();
   const { r0, r1, c0, c1 } = rangeOf(s.anchor, s.sel);
   return Array.from({ length: r1 - r0 + 1 }, (_, i) => Array.from({ length: c1 - c0 + 1 }, (_, j) => cellText(s.graph, m, { row: r0 + i, col: c0 + j })));
+}
+
+/** Stored values of the selected data cells (IDs and the header row excluded), and their common number format. */
+export function selectionValues(): { values: Value[]; cells: number; format?: string } {
+  const { anchor, sel } = useStore.getState();
+  const m = currentSheet();
+  const { r0, r1, c0, c1 } = rangeOf(anchor, sel);
+  const cols = m.columns.slice(Math.max(c0, 1) - 1, c1);
+  const rows = m.rows.slice(Math.max(r0, 1) - 1, r1);
+  const values = rows.flatMap((n) => cols.map((c) => n.props[c.key]));
+  const formats = new Set(cols.map((c) => (c.type === "number" ? (c.format ?? "") : "")));
+  return { values, cells: (r1 - r0 + 1) * (c1 - c0 + 1), format: formats.size === 1 ? [...formats][0] || undefined : undefined };
 }
 
 export function clearSelection() {

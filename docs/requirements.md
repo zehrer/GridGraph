@@ -63,6 +63,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | SH-18 | **Add row** (toolbar, Insert menu, context menu) appends an instance and selects its name cell; **Delete row(s)** removes the selected rows. Delete row(s) removes every row the selection touches. | Done |
 | SH-19 | **Footer row** (sticky): row count under the ID; per column a choice of None, Sum, Average, Min, Max, Count, Empty (Min/Max also for dates; numbers stored as text are counted too). | Done |
 | SH-20 | Context menu (right click) on cells and row numbers: add/delete rows, cut, copy, paste. | Done |
+| SH-22 | **Status bar figure** (bottom right, like Google Sheets): for a selection of two or more cells shows the Sum of its numbers; a click lists Sum, Average, Min, Max, Count, Count numbers and keeps the chosen one (per browser). Without numbers it shows Count. IDs are not counted. | Done |
 | SH-21 | Reorder rows by drag and drop (manual order instead of ID order). | Idea |
 
 ## 4a. Format menu

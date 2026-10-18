@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseClipboard, parseTSV, toTSV } from "../model/clipboard";
 import { displayValue, guessType, normalize } from "../model/graph";
-import { summarize } from "../model/summary";
+import { selectionStats, summarize } from "../model/summary";
 import { displayNumber, formatNumber, parseNumber, setLocale } from "../model/locale";
 import { emptyGraph } from "../model/graph";
 import { newDbInfo, useStore } from "../model/store";
-import { addRow, commitCell, formatColumns, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
+import { addRow, selectionValues, commitCell, formatColumns, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
 
 beforeEach(() => setLocale("en-US"));
 
@@ -187,6 +187,21 @@ describe("decimal comma", () => {
     expect(displayNumber(1234.5, "EUR")).toBe("1.234,50\u00a0€");
     expect(formatNumber(0.5)).toBe("0,5");
     setLocale("en-US");
+  });
+});
+
+describe("selection statistics", () => {
+  beforeEach(() => useStore.getState().open(emptyGraph(), newDbInfo()));
+
+  it("sums the numbers of the selected cells and counts the filled ones", () => {
+    writeCells({ row: 0, col: 1 }, [["Name", "Price", "Note"], ["A", "0,15", "x"], ["B", "12,99", "7"], ["C", "", ""]]);
+    useStore.getState().select({ row: 1, col: 0 });
+    useStore.getState().select({ row: 3, col: 3 }, true);
+    const { values, cells } = selectionValues();
+    expect(cells).toBe(12);
+    const stats = selectionStats(values);
+    expect(stats).toMatchObject({ sum: 20.14, min: 0.15, max: 12.99, count: 7, countNumbers: 3 });
+    expect(stats.avg).toBeCloseTo(6.7133, 4);
   });
 });
 

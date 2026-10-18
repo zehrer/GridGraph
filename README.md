@@ -26,6 +26,7 @@ Live: https://zehrer.github.io/GridGraph/
 | Columns | ▾ on a header: sort, move, wrap, hide, delete; drag a header to move it, drag its border to resize |
 | Rows | ＋ Row / − Row in the toolbar or right click; Shift+Space selects whole rows; Edit → Renumber IDs closes gaps |
 | Footer | Click below a column to show Sum, Average, Min, Max, Count or Empty |
+| Status bar | Select cells: bottom right shows their Sum; click it for Average, Min, Max, Count |
 | Format | Format menu: data type, number format (€, $, %, decimals) and date format (e.g. DD.MM.YYYY) of the selected columns |
 | Settings | View → Settings: rows/columns shown at least; number and date notation (e.g. German 1.234,56 · 25.11.2026) |
 | Undo / redo | ⌘Z / ⇧⌘Z |

@@ -1,6 +1,6 @@
 import { displayValue } from "./graph";
 import { displayNumber, parseNumber } from "./locale";
-import type { Column, Graph, GraphNode, Summary } from "./types";
+import type { Column, Graph, GraphNode, Summary, Value } from "./types";
 
 export const SUMMARIES: [Summary, string][] = [
   ["sum", "Sum"],
@@ -28,4 +28,31 @@ export function summarize(g: Graph, col: Column, rows: GraphNode[], kind: Summar
   const sum = nums.reduce((a, b) => a + b, 0);
   const value = { sum, avg: sum / nums.length, min: Math.min(...nums), max: Math.max(...nums) }[kind];
   return `${label} ${displayNumber(Math.round(value * 10000) / 10000, col.format)}`;
+}
+
+export type SelectionStat = "sum" | "avg" | "min" | "max" | "count" | "countNumbers";
+
+export const SELECTION_STATS: [SelectionStat, string][] = [
+  ["sum", "Sum"],
+  ["avg", "Average"],
+  ["min", "Min"],
+  ["max", "Max"],
+  ["count", "Count"],
+  ["countNumbers", "Count numbers"],
+];
+
+/** Figures for the status bar over the non-empty values of a selection; number figures are undefined without numbers. */
+export function selectionStats(values: Value[]): Record<SelectionStat, number | undefined> {
+  const filled = values.filter((v) => v !== undefined && v !== "");
+  const nums = filled.map((v) => (typeof v === "number" ? v : typeof v === "string" ? parseNumber(v) : undefined)).filter((v): v is number => v !== undefined);
+  const sum = nums.reduce((a, b) => a + b, 0);
+  const has = nums.length > 0;
+  return {
+    sum: has ? Number(sum.toPrecision(12)) : undefined,
+    avg: has ? Number((sum / nums.length).toPrecision(12)) : undefined,
+    min: has ? Math.min(...nums) : undefined,
+    max: has ? Math.max(...nums) : undefined,
+    count: filled.length,
+    countNumbers: nums.length,
+  };
 }
