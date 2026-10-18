@@ -1,0 +1,94 @@
+import { describe, expect, it } from "vitest";
+import { addInstance, addType, columnsOf, deleteEdge, deleteNode, edgesOf, emptyGraph, parseValue, upsertColumn } from "./graph";
+import { fromGraphML, fromJSON, toGraphML, toJSON } from "./io";
+import { sampleGraph } from "./sample";
+
+describe("graph model", () => {
+  it("derives typeOf and relation edges from the data", () => {
+    const edges = edgesOf(sampleGraph());
+    expect(edges.filter((e) => e.kind === "typeOf")).toHaveLength(7);
+    expect(edges).toContainEqual(expect.objectContaining({ source: "person_alice", target: "comp_acme", relation: "Arbeitgeber", kind: "column" }));
+    expect(edges).toContainEqual(expect.objectContaining({ source: "person_alice", target: "person_bob", kind: "free" }));
+  });
+
+  it("discovers schemaless properties as extra columns", () => {
+    const keys = columnsOf(sampleGraph(), "type_person").map((c) => c.key);
+    expect(keys).toEqual(["age", "birthday", "isRemote", "company", "hobbies", "zertifikate"]);
+  });
+
+  it("deleting a type removes its instances and dangling references", () => {
+    const g = sampleGraph();
+    deleteNode(g, "type_company");
+    expect(g.nodes.comp_acme).toBeUndefined();
+    expect(g.nodes.person_alice.props.company).toBeUndefined();
+    expect(g.nodes.type_person.columns?.find((c) => c.key === "company")?.type).toBe("text");
+  });
+
+  it("deleting a relation edge clears the property", () => {
+    const g = sampleGraph();
+    deleteEdge(g, edgesOf(g).find((e) => e.id === "proj_alpha:lead")!);
+    expect(g.nodes.proj_alpha.props.lead).toBeUndefined();
+  });
+
+  it("parses cell input per column type", () => {
+    const g = emptyGraph();
+    const t = addType(g, "Firma");
+    const acme = addInstance(g, t, "Acme");
+    expect(parseValue(g, { key: "n", label: "n", type: "number" }, "1.234,5")).toBe(1234.5);
+    expect(parseValue(g, { key: "n", label: "n", type: "number" }, "3.14")).toBe(3.14);
+    expect(parseValue(g, { key: "d", label: "d", type: "date" }, "5.3.2024")).toBe("2024-03-05");
+    expect(parseValue(g, { key: "b", label: "b", type: "boolean" }, "Ja")).toBe(true);
+    const rel = { key: "r", label: "r", type: "relation" as const, targetTypeId: t };
+    expect(parseValue(g, rel, "acme")).toBe(acme);
+    const created = parseValue(g, rel, "Neu GmbH") as string;
+    expect(g.nodes[created]).toMatchObject({ label: "Neu GmbH", typeId: t });
+  });
+
+  it("upsertColumn renames in place", () => {
+    const g = emptyGraph();
+    const t = addType(g);
+    upsertColumn(g, t, { key: "a", label: "A", type: "text" });
+    upsertColumn(g, t, { key: "a", label: "Alpha", type: "text" });
+    expect(g.nodes[t].columns).toEqual([{ key: "a", label: "Alpha", type: "text" }]);
+  });
+});
+
+describe("import / export", () => {
+  it("round-trips JSON", () => {
+    expect(fromJSON(toJSON(sampleGraph()))).toEqual(sampleGraph());
+  });
+
+  it("round-trips GraphML", () => {
+    expect(fromGraphML(toGraphML(sampleGraph()))).toEqual(sampleGraph());
+  });
+
+  it("imports the v1 JSON format", () => {
+    const v1 = {
+      version: "1.0",
+      nodes: [
+        { id: "t", label: "Person", isType: true, color: "#3b82f6", properties: {}, typeProperties: [{ key: "boss", label: "Chef", type: "relation", targetTypeId: "t", relationName: "reportsTo" }] },
+        { id: "a", label: "Alice", isType: false, typeId: "t", properties: { boss: "b" } },
+        { id: "b", label: "Bob", isType: false, properties: {} },
+      ],
+      edges: [
+        { id: "e1", source: "a", target: "t", relation: "typeOf" },
+        { id: "e2", source: "b", target: "t", relation: "typeOf" },
+        { id: "e3", source: "a", target: "b", relation: "reportsTo" },
+        { id: "e4", source: "b", target: "a", relation: "knows" },
+      ],
+    };
+    const g = fromJSON(JSON.stringify(v1));
+    expect(g.nodes.b.typeId).toBe("t");
+    expect(g.nodes.t.columns).toEqual([{ key: "boss", label: "Chef", type: "relation", targetTypeId: "t" }]);
+    expect(Object.values(g.edges)).toEqual([{ id: "e4", source: "b", target: "a", relation: "knows" }]);
+  });
+
+  it("imports foreign GraphML with generated key ids", () => {
+    const xml = `<graphml><key id="d0" for="node" attr.name="label"/><key id="d1" for="node" attr.name="city"/>
+      <graph><node id="x"><data key="d0">X</data><data key="d1">Berlin</data></node><node id="y"/>
+      <edge source="x" target="y"><data key="d9">knows</data></edge></graph></graphml>`;
+    const g = fromGraphML(xml);
+    expect(g.nodes.x).toEqual({ id: "x", label: "X", props: { city: "Berlin" } });
+    expect(Object.values(g.edges)[0]).toMatchObject({ source: "x", target: "y" });
+  });
+});

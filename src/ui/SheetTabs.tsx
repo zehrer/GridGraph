@@ -1,0 +1,72 @@
+import { useState } from "react";
+import { useStore } from "../model/store";
+import { PALETTE, typesOf } from "../model/graph";
+import { deleteSheet, newSheet } from "./actions";
+import { MenuList } from "./Menu";
+
+/** Bottom sheet tabs: one tab per type, like the sheets of a spreadsheet. */
+export function SheetTabs() {
+  const { graph, activeTypeId, setActiveType, edit, view } = useStore();
+  const [menu, setMenu] = useState<"list" | string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const types = typesOf(graph);
+
+  const rename = (id: string, label: string) => {
+    setRenaming(null);
+    if (label.trim() && label.trim() !== graph.nodes[id]?.label) edit((g) => (g.nodes[id].label = label.trim()));
+  };
+
+  return (
+    <footer className="sheet-tabs">
+      <button className="icon" title="Blatt (Typ) hinzufügen" onClick={newSheet}>+</button>
+      <div className="menu-anchor">
+        <button className="icon" title="Alle Blätter" onClick={() => setMenu("list")}>≡</button>
+        {menu === "list" && <MenuList up onClose={() => setMenu(null)} items={types.map((t) => ({ label: t.label, action: () => setActiveType(t.id) }))} />}
+      </div>
+      {types.map((t) => {
+        const active = t.id === activeTypeId && view === "sheet";
+        return (
+          <div
+            key={t.id}
+            className={`tab menu-anchor${active ? " active" : ""}`}
+            style={active ? { borderBottomColor: t.color } : undefined}
+            onClick={() => {
+              setActiveType(t.id);
+              useStore.getState().setView("sheet");
+            }}
+            onDoubleClick={() => setRenaming(t.id)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu(t.id);
+            }}
+          >
+            {renaming === t.id ? (
+              <input autoFocus defaultValue={t.label} onBlur={(e) => rename(t.id, e.target.value)} onKeyDown={(e) => {
+                if (e.key === "Enter") rename(t.id, e.currentTarget.value);
+                if (e.key === "Escape") setRenaming(null);
+              }} />
+            ) : (
+              <span>{t.label}</span>
+            )}
+            {active && <button className="caret" onClick={(e) => (e.stopPropagation(), setMenu(t.id))}>▾</button>}
+            {menu === t.id && (
+              <MenuList up onClose={() => setMenu(null)} items={[
+                { label: "Umbenennen", action: () => setRenaming(t.id) },
+                { label: "Löschen", action: () => deleteSheet(t.id) },
+              ]}>
+                <div className="swatches">
+                  {PALETTE.map((c) => (
+                    <button key={c} style={{ background: c }} className={c === t.color ? "on" : ""} title="Farbe" onClick={() => {
+                      setMenu(null);
+                      edit((g) => (g.nodes[t.id].color = c));
+                    }} />
+                  ))}
+                </div>
+              </MenuList>
+            )}
+          </div>
+        );
+      })}
+    </footer>
+  );
+}
