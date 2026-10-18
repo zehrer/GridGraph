@@ -24,7 +24,7 @@ Live: https://zehrer.github.io/GridGraph/
 | Select a range | Drag, Shift + click, Shift + arrow keys |
 | Copy / cut / paste | ⌘C / ⌘X / ⌘V – works with Numbers, Google Sheets and Excel |
 | Columns | ▾ on a header: sort, move, wrap, hide, delete; drag a header to move it, drag its border to resize |
-| Rows | ＋ Row / − Row in the toolbar or right click; click an ID to select the row; Edit → Renumber IDs closes gaps |
+| Rows | ＋ Row / − Row in the toolbar or right click; Shift+Space selects whole rows; Edit → Renumber IDs closes gaps |
 | Footer | Click below a column to show Sum, Average, Min, Max, Count or Empty |
 | Format | Format menu: data type, number format (€, $, %, decimals) and date format (e.g. DD.MM.YYYY) of the selected columns |
 | Settings | View → Settings: how many rows and columns the sheet shows at least |

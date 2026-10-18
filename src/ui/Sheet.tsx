@@ -71,13 +71,6 @@ export function Sheet() {
       A.commitCell(cell, String(m.rows[cell.row - 1]?.props[column.key] !== true));
     }
   }).current;
-  /** Clicking an ID (the row header) selects the whole row. */
-  const onRowHead = useRef((e: MouseEvent, row: number) => {
-    if (e.button !== 0) return;
-    const { select } = useStore.getState();
-    select({ row, col: 0 }, e.shiftKey);
-    select({ row, col: Math.max(latest.current.m.columns.length, 1) }, true);
-  }).current;
 
   useEffect(() => {
     const up = () => (dragging.current = false);
@@ -119,7 +112,13 @@ export function Sheet() {
     // Read the selection from the store: a click right before the key may not have re-rendered yet.
     const { sel } = useStore.getState();
     const delta = e.key === "Tab" ? [0, e.shiftKey ? -1 : 1] : e.key === "Enter" && e.shiftKey ? [-1, 0] : MOVES[e.key];
-    if (delta) {
+    if (e.key === " " && e.shiftKey) {
+      // Shift+Space selects the whole rows of the selection, as in Google Sheets.
+      e.preventDefault();
+      const { anchor } = useStore.getState();
+      select({ row: anchor.row, col: 0 });
+      select({ row: sel.row, col: nCols - 1 }, true);
+    } else if (delta) {
       e.preventDefault();
       move(delta[0], delta[1], sel, e.shiftKey && e.key in MOVES);
     } else if (A.readOnly(sel) && e.key.length === 1) {
@@ -322,7 +321,6 @@ export function Sheet() {
     editText: edit?.cell.row === row ? edit.text : undefined,
     editor: edit?.cell.row === row ? editor : null,
     onCell,
-    onRowHead,
   });
 
   const title = sel.col === 0 ? "ID" : (m.columns[sel.col - 1]?.label ?? "new column");
@@ -394,26 +392,30 @@ interface RowProps {
   editText?: string;
   editor: React.ReactNode;
   onCell: CellHandler;
-  onRowHead: (e: MouseEvent, row: number) => void;
 }
 
-/** One instance row; column 0 is its ID, which doubles as the row header. */
-const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, rangeCols, editCol, editText, editor, onCell, onRowHead }: RowProps) {
+/** One instance row; column 0 is its ID, which also marks the selected rows (but selects like any cell). */
+const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, rangeCols, editCol, editText, editor, onCell }: RowProps) {
   const [c0, c1] = rangeCols ? rangeCols.split(":").map(Number) : [-1, -1];
   return (
     <tr>
       {Array.from({ length: nCols }, (_, col) => {
         const column = columns[col - 1];
         const cell = { row, col };
-        const cls = col === 0
-          ? ["id", (selCol >= 0 || c0 >= 0) && "hl"]
-          : [col === selCol && "sel", col >= c0 && col <= c1 && "in-range", column?.type === "number" && "num", column?.wrap && "wrap"];
+        const cls = [
+          col === 0 && "id",
+          col === 0 && (selCol >= 0 || c0 >= 0) && "hl",
+          col === selCol && "sel",
+          col >= c0 && col <= c1 && "in-range",
+          column?.type === "number" && "num",
+          column?.wrap && "wrap",
+        ];
         return (
           <td
             key={col}
             data-cell={`${row}:${col}`}
             className={cls.filter(Boolean).join(" ")}
-            onMouseDown={(e) => (col === 0 ? onRowHead(e, row) : onCell(e, cell))}
+            onMouseDown={(e) => onCell(e, cell)}
             onMouseEnter={(e) => onCell(e, cell)}
             onDoubleClick={(e) => onCell(e, cell)}
           >
