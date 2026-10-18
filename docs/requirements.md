@@ -42,8 +42,10 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 |---|---|---|
 | SH-1 | One **sheet tab per type** at the bottom: add (+), list all (≡), rename (double-click), color, delete. | Done |
 | SH-2 | The **header row** (sticky) shows the property names; there are no A/B/C column letters. Typing a name into an empty header cell creates a column. | Done |
-| SH-3 | The first column is the read-only **ID**; rows are sorted by ID unless the user sorts by a column. | Done |
+| SH-3 | The first column is the read-only **ID**, fixed on the left; it doubles as the row header (there are no separate row numbers). Clicking an ID selects the row. Rows are sorted by ID unless the user sorts by a column. | Done |
 | SH-3a | The **name column** is marked (◆, blue header) but can sit anywhere; any column can be made the name column from the column menu. It cannot be deleted. | Done |
+| SH-3b | **Renumber IDs** (Edit menu, or right click on the ID header) gives the rows 1…n again, closing gaps left by deletes, after a confirmation. | Done |
+| SH-3c | **Settings** (View → Settings…): minimum number of rows and columns shown (default 20 and 5); the sheet always shows the data plus one empty row and column. Stored per browser. | Done |
 | SH-4 | Typing into an empty row creates an instance; typing into an empty column creates a property. | Done |
 | SH-5 | Editing: start typing, Enter, F2 or double-click; Enter/Tab confirm and move; Esc cancels; Delete/Backspace clears. | Done |
 | SH-6 | Arrow keys, Tab and Enter move the active cell. | Done |
@@ -58,7 +60,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | SH-15 | **Column menu** (▾ on the header, or right click): sort, move, wrap text, use as name column, hide, delete. | Done |
 | SH-16 | **Hide / show** columns: hidden columns leave a ⋮ marker in the header to show them again; View → Show hidden columns shows all. | Done |
 | SH-17 | **Wrap text** per column; wrapped rows grow in height. | Done |
-| SH-18 | **Add row** (toolbar, Insert menu, context menu) appends an instance and selects its name cell; **Delete row(s)** removes the selected rows. Clicking a row number selects the row. | Done |
+| SH-18 | **Add row** (toolbar, Insert menu, context menu) appends an instance and selects its name cell; **Delete row(s)** removes the selected rows. Clicking an ID selects the row. | Done |
 | SH-19 | **Footer row** (sticky): row count under the ID; per column a choice of None, Sum, Average, Min, Max, Count, Empty (Min/Max also for dates). | Done |
 | SH-20 | Context menu (right click) on cells and row numbers: add/delete rows, cut, copy, paste. | Done |
 | SH-21 | Reorder rows by drag and drop (manual order instead of ID order). | Idea |
@@ -128,6 +130,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | 2026-10-18 | UI language is English only; number and date notation follows the browser locale. |
 | 2026-10-18 | The ID is built in: every instance gets a running number per type, shown as the first, read-only column (replaces the short-lived "Auto number" column type). |
 | 2026-10-18 | The name is a normal column marked as the name column (`nameKey`), not a fixed first column; older data is migrated on load. |
+| 2026-10-18 | No separate row numbers: the ID column is the row header. Display settings (minimum rows/columns) are personal and live in the browser, not in the database. |
 | 2026-10-18 | A pasted table only brings its own header row into an empty sheet when it has several columns with text headings, so a pasted list of names keeps its first entry. |
 
 ## 10. Open questions

@@ -87,12 +87,11 @@ main { flex: 1; min-height: 0; display: flex; }
 .grid th, .grid td {
   height: 21px; padding: 0 4px;
   border-right: 1px solid var(--grid); border-bottom: 1px solid var(--grid);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; scroll-margin: 25px 0 25px 46px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; scroll-margin: 25px 0 25px 56px;
 }
 .grid td { cursor: cell; position: relative; }
 .grid td.wrap { white-space: pre-wrap; overflow-wrap: anywhere; text-overflow: clip; vertical-align: top; }
 .grid td.num { text-align: right; }
-.grid td.id { text-align: right; color: var(--muted); background: #fbfbfb; cursor: default; }
 .grid td.in-range { background: #e8f0fe; }
 .grid td.sel { outline: 2px solid #1a73e8; outline-offset: -2px; }
 
@@ -120,17 +119,14 @@ main { flex: 1; min-height: 0; display: flex; }
 }
 .unhide:hover { background: var(--accent-soft); }
 
-/* Row numbers */
-.grid tbody th, .grid tfoot th {
-  position: sticky; left: 0; z-index: 1; background: var(--head);
-  color: var(--muted); font-weight: 400; font-size: 11px; text-align: center; cursor: default;
-}
-.grid tbody th.hl { background: var(--accent-soft); color: #041e49; font-weight: 500; }
-.grid .corner { left: 0; z-index: 3; }
+/* ID column = row header, fixed on the left */
+.grid tr > td:first-child { position: sticky; left: 0; z-index: 1; border-right-color: #c4c7c5; }
+.grid tbody td.id { background: var(--head); color: var(--muted); font-size: 12px; text-align: right; cursor: default; }
+.grid tbody td.id.hl { background: var(--accent-soft); color: #041e49; font-weight: 500; }
+.grid thead tr > td:first-child, .grid tfoot tr > td:first-child { z-index: 3; }
 
 /* Footer with column summaries */
 .grid tfoot > tr > * { position: sticky; bottom: 0; z-index: 2; height: 25px; background: var(--head); border-top: 1px solid #c4c7c5; font-size: 12px; }
-.grid tfoot th { z-index: 3; }
 .grid tfoot td.id { text-align: right; }
 .grid tfoot td.summary { cursor: pointer; text-align: right; color: var(--text); }
 .grid tfoot td.summary:hover { background: var(--hover); }
@@ -196,3 +192,16 @@ main { flex: 1; min-height: 0; display: flex; }
   .toolbar { margin: 4px 8px 8px; }
   .inspector { left: 12px; width: auto; top: auto; max-height: 55%; }
 }
+
+/* --- Dialogs --- */
+.dialog { border: 0; border-radius: 12px; padding: 20px 24px; width: min(380px, calc(100vw - 32px)); box-shadow: 0 4px 16px rgb(60 64 67 / 30%); }
+.dialog::backdrop { background: rgb(32 33 36 / 40%); }
+.dialog h3 { margin: 0 0 16px; font-size: 18px; font-weight: 400; }
+.dialog label { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 10px 0; }
+.dialog input { width: 80px; padding: 6px 8px; border: 1px solid #747775; border-radius: 4px; text-align: right; }
+.dialog .hint { color: var(--muted); font-size: 12px; margin: 14px 0 0; }
+.dialog footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.dialog footer button { border: 0; background: none; color: var(--accent); font-weight: 500; padding: 8px 14px; border-radius: 18px; }
+.dialog footer button:hover { background: #e8f0fe; }
+.dialog footer .primary { background: var(--accent); color: #fff; }
+.dialog footer .primary:hover { background: #0842a0; }

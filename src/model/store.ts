@@ -17,7 +17,21 @@ export const rangeOf = (a: Cell, b: Cell) => ({
   c0: Math.min(a.col, b.col), c1: Math.max(a.col, b.col),
 });
 
+/** Personal display settings, kept per browser (not part of a database). */
+export interface Prefs { minRows: number; minCols: number }
+const PREFS_KEY = "gridgraph.prefs";
+const DEFAULT_PREFS: Prefs = { minRows: 20, minCols: 5 };
+function loadPrefs(): Prefs {
+  try {
+    return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") };
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
 interface State {
+  prefs: Prefs;
+  setPrefs: (p: Partial<Prefs>) => void;
   db: DbInfo;
   /** All databases saved in this browser, most recently saved first. */
   dbs: DbInfo[];
@@ -62,6 +76,16 @@ function settle(g: Graph, activeTypeId: string) {
 export const useStore = create<State>()((set, get) => {
   const initial = emptyGraph();
   return {
+    prefs: loadPrefs(),
+    setPrefs: (p) => {
+      const prefs = { ...get().prefs, ...p };
+      set({ prefs });
+      try {
+        localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+      } catch {
+        // Private mode or blocked storage: the setting still applies for this session.
+      }
+    },
     db: newDbInfo(),
     dbs: [],
     revision: 0,

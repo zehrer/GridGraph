@@ -5,7 +5,7 @@ import { summarize } from "../model/summary";
 import { setLocale } from "../model/locale";
 import { emptyGraph } from "../model/graph";
 import { newDbInfo, useStore } from "../model/store";
-import { addRow, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
+import { addRow, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
 
 beforeEach(() => setLocale("en-US"));
 
@@ -71,6 +71,11 @@ describe("writing cells", () => {
     deleteRows();
     addRow();
     expect(currentSheet().rows.map((r) => [r.no, nameOf(r.id)])).toEqual([[1, "A"], [3, "C"], [4, ""]]);
+    // Renumbering closes the gaps; the next row continues after the last ID.
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renumberIds();
+    addRow();
+    expect(currentSheet().rows.map((r) => r.no)).toEqual([1, 2, 3, 4]);
   });
 
   it("moves, hides and renames columns; the name column can move and be reassigned", () => {

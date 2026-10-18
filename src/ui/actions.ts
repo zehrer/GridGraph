@@ -1,4 +1,4 @@
-import { addInstance, addType, columnsOf, deleteNode, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
+import { addInstance, addType, columnsOf, deleteNode, renumber, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
 import { parseNumber } from "../model/locale";
 import { download, importText, toGraphML, toJSON } from "../model/io";
 import { sampleGraph } from "../model/sample";
@@ -179,6 +179,14 @@ export function deleteRows() {
   if (!doomed.length) return;
   edit((g) => doomed.forEach((n) => deleteNode(g, n.id)));
   select({ row: Math.max(r0, 1), col: sel.col });
+}
+
+export function renumberIds() {
+  const { graph, activeTypeId, edit } = useStore.getState();
+  const n = instancesOf(graph, activeTypeId).length;
+  if (n && confirm(`Renumber the ${n} rows of "${graph.nodes[activeTypeId].label}" as 1–${n}? IDs that were used elsewhere will no longer match.`)) {
+    edit((g) => renumber(g, activeTypeId));
+  }
 }
 
 // --- Columns (grid column numbers, 1 = first visible column) ---

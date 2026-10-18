@@ -3,11 +3,13 @@ import { useStore } from "../model/store";
 import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
 import { openDatabase } from "../model/persist";
+import { Settings } from "./Settings";
 
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
 
 export function Header() {
   const [open, setOpen] = useState<number | null>(null);
+  const [settings, setSettings] = useState(false);
   const s = useStore();
   const { sel } = s;
   const m = A.currentSheet();
@@ -47,6 +49,7 @@ export function Header() {
         { label: "Paste", shortcut: `${MOD}V`, action: A.pasteFromClipboard },
         "-",
         { label: "Delete row(s)", disabled: !hasRow, action: A.deleteRows },
+        { label: "Renumber IDs…", disabled: !m.rows.length, action: A.renumberIds },
         { label: "Delete column", disabled: !hasCol, action: () => A.deleteColumn(sel.col) },
       ],
     },
@@ -65,6 +68,8 @@ export function Header() {
         { label: "Graph", action: () => s.setView("graph", m.rows[sel.row - 1]?.id ?? null) },
         "-",
         { label: hiddenCount ? `Show ${hiddenCount} hidden column${hiddenCount > 1 ? "s" : ""}` : "No hidden columns", disabled: !hiddenCount, action: () => A.unhideColumns() },
+        "-",
+        { label: "Settings…", action: () => setSettings(true) },
       ],
     },
   ];
@@ -108,6 +113,7 @@ export function Header() {
         </nav>
       </div>
       <div className="save-status">{s.saveError ? "⚠︎ Not saved" : s.savedAt ? `Saved ${s.savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</div>
+      {settings && <Settings onClose={() => setSettings(false)} />}
     </header>
   );
 }

@@ -9,7 +9,6 @@ import { MenuList, type MenuItem } from "./Menu";
 
 const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗" };
 const MOVES: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
-const ROW_HEAD = 46;
 const ID_WIDTH = 56;
 const DEFAULT_WIDTH = 120;
 
@@ -18,7 +17,7 @@ type CellHandler = (e: MouseEvent, cell: Cell) => void;
 type Popup = { x: number; y: number; up?: boolean; items: MenuItem[] };
 
 export function Sheet() {
-  const { graph, activeTypeId, sort, filter, sel, anchor, select } = useStore();
+  const { graph, activeTypeId, sort, filter, sel, anchor, select, prefs } = useStore();
   const m = useMemo(() => A.sheetModel(graph, activeTypeId, { sort, filter }), [graph, activeTypeId, sort, filter]);
   const [edit, setEditState] = useState<Edit | null>(null);
   const editRef = useRef<Edit | null>(null);
@@ -29,8 +28,9 @@ export function Sheet() {
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const nRows = Math.max(m.rows.length + 1, 20) + extraRows;
-  const nCols = Math.max(m.columns.length + 2, 6);
+  // Data plus one empty row/column to type into, at least as many as the user's settings ask for.
+  const nRows = Math.max(m.rows.length + 1, prefs.minRows) + extraRows;
+  const nCols = Math.max(m.columns.length + 2, prefs.minCols + 1);
   const range = rangeOf(anchor, sel);
   const multi = range.r0 !== range.r1 || range.c0 !== range.c1;
   const widthOf = (c?: Column) => (c && resize?.key === c.key ? resize.width : (c?.width ?? DEFAULT_WIDTH));
@@ -71,7 +71,7 @@ export function Sheet() {
       A.commitCell(cell, String(m.rows[cell.row - 1]?.props[column.key] !== true));
     }
   }).current;
-  /** Clicking a row number selects the whole row. */
+  /** Clicking an ID (the row header) selects the whole row. */
   const onRowHead = useRef((e: MouseEvent, row: number) => {
     if (e.button !== 0) return;
     const { select } = useStore.getState();
@@ -148,6 +148,7 @@ export function Sheet() {
   // --- Menus ---
 
   const columnMenu = (col: number): MenuItem[] => {
+    if (col === 0) return [{ label: "Sort by ID", action: () => A.sortBy(0, true) }, { label: "Renumber IDs…", action: A.renumberIds }];
     const c = m.columns[col - 1];
     if (!c) return [];
     const isName = c.key === m.type.nameKey;
@@ -182,10 +183,10 @@ export function Sheet() {
     setPopup({ x: r.left, y: up ? r.top : r.bottom, up, items });
   };
   const onContextMenu = (e: MouseEvent) => {
-    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cell], [data-row]");
+    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cell]");
     if (!el) return;
     e.preventDefault();
-    const [row, col] = el.dataset.cell ? el.dataset.cell.split(":").map(Number) : [Number(el.dataset.row), 0];
+    const [row, col] = el.dataset.cell!.split(":").map(Number);
     if (!(row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1)) select({ row, col });
     const items = row === 0 ? columnMenu(col) : rowMenu();
     if (items.length) setPopup({ x: e.clientX, y: e.clientY, items });
@@ -330,7 +331,7 @@ export function Sheet() {
     <div className="sheet">
       <div className="formula-bar">
         <div className="name-box" title={title}>
-          {multi ? `${range.r1 - range.r0 + 1} × ${range.c1 - range.c0 + 1}` : sel.row === 0 ? `${title} (header)` : `${title} ${sel.row}`}
+          {multi ? `${range.r1 - range.r0 + 1} × ${range.c1 - range.c0 + 1}` : sel.row === 0 ? `${title} (header)` : `${title} · ${m.rows[sel.row - 1] ? `ID ${m.rows[sel.row - 1].no}` : "new row"}`}
         </div>
         <span className="fx">fx</span>
         <input
@@ -343,14 +344,12 @@ export function Sheet() {
       </div>
 
       <div className="grid-scroll" ref={gridRef} tabIndex={0} onKeyDown={onGridKey} onContextMenu={onContextMenu}>
-        <table className="grid" style={{ width: ROW_HEAD + widths.reduce((a, b) => a + b, 0) }}>
+        <table className="grid" style={{ width: widths.reduce((a, b) => a + b, 0) }}>
           <colgroup>
-            <col style={{ width: ROW_HEAD }} />
             {widths.map((w, i) => <col key={i} style={{ width: w }} />)}
           </colgroup>
           <thead>
             <tr>
-              <th className="corner" />
               {Array.from({ length: nCols }, (_, col) => headerCell(col))}
             </tr>
           </thead>
@@ -361,7 +360,6 @@ export function Sheet() {
           </tbody>
           <tfoot>
             <tr>
-              <th />
               <td className="id" title="Rows">{m.rows.length}</td>
               {Array.from({ length: nCols - 1 }, (_, i) => footerCell(i + 1))}
             </tr>
@@ -399,22 +397,23 @@ interface RowProps {
   onRowHead: (e: MouseEvent, row: number) => void;
 }
 
-/** One instance row; column 0 is its ID. */
+/** One instance row; column 0 is its ID, which doubles as the row header. */
 const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, rangeCols, editCol, editText, editor, onCell, onRowHead }: RowProps) {
   const [c0, c1] = rangeCols ? rangeCols.split(":").map(Number) : [-1, -1];
   return (
     <tr>
-      <th data-row={row} className={selCol >= 0 || c0 >= 0 ? "hl" : ""} onMouseDown={(e) => onRowHead(e, row)}>{row}</th>
       {Array.from({ length: nCols }, (_, col) => {
         const column = columns[col - 1];
         const cell = { row, col };
-        const cls = [col === 0 && "id", col === selCol && "sel", col >= c0 && col <= c1 && "in-range", column?.type === "number" && "num", column?.wrap && "wrap"];
+        const cls = col === 0
+          ? ["id", (selCol >= 0 || c0 >= 0) && "hl"]
+          : [col === selCol && "sel", col >= c0 && col <= c1 && "in-range", column?.type === "number" && "num", column?.wrap && "wrap"];
         return (
           <td
             key={col}
             data-cell={`${row}:${col}`}
             className={cls.filter(Boolean).join(" ")}
-            onMouseDown={(e) => onCell(e, cell)}
+            onMouseDown={(e) => (col === 0 ? onRowHead(e, row) : onCell(e, cell))}
             onMouseEnter={(e) => onCell(e, cell)}
             onDoubleClick={(e) => onCell(e, cell)}
           >

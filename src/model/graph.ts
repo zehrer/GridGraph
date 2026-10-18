@@ -86,6 +86,13 @@ export function addInstance(g: Graph, typeId: string, name = ""): string {
   return id;
 }
 
+/** Gives the instances of a type the IDs 1…n again (in their current ID order), closing gaps left by deletes. */
+export function renumber(g: Graph, typeId: string) {
+  const insts = instancesOf(g, typeId).sort((a, b) => (a.no ?? 0) - (b.no ?? 0));
+  insts.forEach((n, i) => (n.no = i + 1));
+  g.nodes[typeId].nextNo = insts.length + 1;
+}
+
 export function setProp(g: Graph, nodeId: string, key: string, value: Value | undefined) {
   const n = g.nodes[nodeId];
   if (!n) return;
