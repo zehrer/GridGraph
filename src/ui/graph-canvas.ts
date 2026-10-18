@@ -4,7 +4,7 @@ import type { DerivedEdge, Graph, GraphNode } from "../model/types";
 interface Body { x: number; y: number; vx: number; vy: number; pinned?: boolean }
 
 const FONT = "Roboto, -apple-system, 'Segoe UI', Arial, sans-serif";
-const radius = (n: GraphNode) => (n.isType ? 30 : 22);
+const radius = (n: GraphNode) => (n.isType ? 14 : 22);
 
 /** Layout positions survive view switches; they are not part of the saved data. */
 const bodies = new Map<string, Body>();
@@ -19,7 +19,10 @@ export interface CanvasEvents {
 export class GraphCanvas {
   private ctx: CanvasRenderingContext2D;
   private g: Graph = { nodes: {}, edges: {} };
+  /** Nodes and edges currently drawn: without type nodes and typeOf edges when types are hidden. */
+  private nodes: GraphNode[] = [];
   private edges: DerivedEdge[] = [];
+  private showTypes = true;
   private pan = { x: 0, y: 0 };
   private zoom = 1;
   private alpha = 1;
@@ -27,6 +30,7 @@ export class GraphCanvas {
   private drag: { id?: string; connect?: boolean; px: number; py: number; moved?: boolean } | null = null;
   private pointer = { x: 0, y: 0 };
   private sized = false;
+  private fitWhenSized = false;
   selected: string | null = null;
   /** Frame the whole graph once the layout has settled. */
   fitOnSettle = false;
@@ -45,13 +49,35 @@ export class GraphCanvas {
 
   setGraph(g: Graph) {
     this.g = g;
-    this.edges = edgesOf(g);
+    this.refresh();
+    let added = 0;
     for (const n of Object.values(g.nodes)) {
       if (bodies.has(n.id)) continue;
       const near = n.typeId ? bodies.get(n.typeId) : undefined;
       const spread = near ? 120 : 400;
       bodies.set(n.id, { x: (near?.x ?? 0) + (Math.random() - 0.5) * spread, y: (near?.y ?? 0) + (Math.random() - 0.5) * spread, vx: 0, vy: 0 });
+      added++;
     }
+    this.kick();
+    // New nodes: let the layout settle off-screen first (bounded by the O(n²) cost), so the first frame is already tidy.
+    if (added) {
+      for (let i = Math.min(250, 400_000 / this.nodes.length ** 2); i > 0; i--) {
+        this.step();
+        this.alpha *= 0.985;
+      }
+    }
+  }
+
+  private refresh() {
+    this.nodes = Object.values(this.g.nodes).filter((n) => this.showTypes || !n.isType);
+    this.edges = edgesOf(this.g).filter((e) => this.showTypes || e.kind !== "typeOf");
+  }
+
+  setShowTypes(show: boolean) {
+    if (show === this.showTypes) return;
+    this.showTypes = show;
+    this.refresh();
+    this.fitOnSettle = true;
     this.kick();
   }
 
@@ -68,7 +94,12 @@ export class GraphCanvas {
   }
 
   fit() {
-    const pts = Object.keys(this.g.nodes).map((id) => bodies.get(id)!).filter(Boolean);
+    // Before the first resize the canvas still has its default size (300×150); fit once it is laid out.
+    if (!this.sized) {
+      this.fitWhenSized = true;
+      return;
+    }
+    const pts = this.nodes.map((n) => bodies.get(n.id)!).filter(Boolean);
     if (!pts.length) return;
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     const [w, h] = [this.canvas.clientWidth, this.canvas.clientHeight];
@@ -97,7 +128,7 @@ export class GraphCanvas {
   };
 
   private step() {
-    const ns = Object.values(this.g.nodes);
+    const ns = this.nodes;
     const bs = ns.map((n) => bodies.get(n.id)!);
     const a = this.alpha;
     for (let i = 0; i < bs.length; i++) {
@@ -137,7 +168,7 @@ export class GraphCanvas {
 
   private hit(e: { offsetX: number; offsetY: number }) {
     const p = this.world(e);
-    return Object.values(this.g.nodes).reverse().find((n) => {
+    return [...this.nodes].reverse().find((n) => {
       const b = bodies.get(n.id)!;
       return Math.hypot(b.x - p.x, b.y - p.y) <= radius(n) + 4;
     });
@@ -212,7 +243,11 @@ export class GraphCanvas {
     Object.assign(this.canvas, { width: width * dpr, height: height * dpr });
     Object.assign(this.canvas.style, { width: `${width}px`, height: `${height}px` });
     if (!this.sized) this.pan = { x: width / 2, y: height / 2 };
-    this.sized = true;
+    this.sized = width > 0 && height > 0;
+    if (this.sized && this.fitWhenSized) {
+      this.fitWhenSized = false;
+      this.fit();
+    }
     this.draw();
   }
 
@@ -246,7 +281,7 @@ export class GraphCanvas {
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    for (const n of Object.values(this.g.nodes)) this.drawNode(n);
+    for (const n of this.nodes) this.drawNode(n);
   }
 
   private drawEdge(e: DerivedEdge) {
@@ -294,7 +329,7 @@ export class GraphCanvas {
     const sel = this.selected === n.id;
 
     ctx.beginPath();
-    if (n.isType) ctx.roundRect(b.x - r, b.y - r, r * 2, r * 2, 8);
+    if (n.isType) ctx.roundRect(b.x - r, b.y - r, r * 2, r * 2, 5);
     else ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
     ctx.fillStyle = n.isType ? color : "#fff";
     ctx.fill();
@@ -307,8 +342,8 @@ export class GraphCanvas {
     ctx.font = `600 13px ${FONT}`;
     ctx.fillStyle = n.isType ? "#fff" : color;
     const name = nodeName(this.g, n);
-    ctx.fillText(n.isType ? "T" : (name.trim()[0] ?? "?").toUpperCase(), b.x, b.y);
-    ctx.font = `${n.isType ? "600 " : ""}12px ${FONT}`;
+    if (!n.isType) ctx.fillText((name.trim()[0] ?? "?").toUpperCase(), b.x, b.y);
+    ctx.font = `${n.isType ? "600 11" : "12"}px ${FONT}`;
     ctx.fillStyle = "#202124";
     ctx.fillText(name || "—", b.x, b.y + r + 12);
   }

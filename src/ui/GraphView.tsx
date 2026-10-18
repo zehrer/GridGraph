@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../model/store";
-import { addEdge, columnsOf, deleteEdge, deleteNode, displayValue, edgesOf, nodeColor, nodeName } from "../model/graph";
+import { addEdge, columnsOf, deleteEdge, deleteNode, displayValue, edgesOf, instancesOf, nodeColor, nodeName, typesOf } from "../model/graph";
 import { showInSheet } from "./actions";
 import { GraphCanvas } from "./graph-canvas";
 
 export function GraphView() {
   const ref = useRef<HTMLCanvasElement>(null);
   const canvas = useRef<GraphCanvas | null>(null);
-  const { graph, focusNodeId, edit } = useStore();
+  const { graph, focusNodeId, edit, prefs, setPrefs } = useStore();
+  const showTypes = prefs.graphTypes;
   const [selected, setSelected] = useState<string | null>(focusNodeId);
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export function GraphView() {
       },
     });
     canvas.current = c;
+    c.setShowTypes(useStore.getState().prefs.graphTypes);
     c.setGraph(useStore.getState().graph);
     // Let the layout settle a little, then frame the graph (or the focused node).
     c.fitOnSettle = !focusNodeId;
@@ -28,6 +30,7 @@ export function GraphView() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => canvas.current?.setGraph(graph), [graph]);
+  useEffect(() => canvas.current?.setShowTypes(showTypes), [showTypes]);
 
   const node = selected ? graph.nodes[selected] : undefined;
   const select = (id: string) => {
@@ -42,7 +45,21 @@ export function GraphView() {
         <button title="Zoom in" onClick={() => canvas.current?.zoomBy(1.25)}>+</button>
         <button title="Zoom out" onClick={() => canvas.current?.zoomBy(0.8)}>−</button>
         <button title="Fit to screen" onClick={() => canvas.current?.fit()}>⤢</button>
+        <button className={showTypes ? "on" : ""} title={showTypes ? "Hide type nodes (show a legend)" : "Show type nodes"} onClick={() => setPrefs({ graphTypes: !showTypes })}>
+          ◆
+        </button>
       </div>
+      {!showTypes && (
+        <div className="graph-legend">
+          {typesOf(graph).map((t) => (
+            <button key={t.id} title={`Open "${t.label}" in the table`} onClick={() => showInSheet(t.id)}>
+              <i style={{ background: t.color }} />
+              {t.label}
+              <span>{instancesOf(graph, t.id).length}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="graph-hint">Drag: move · Shift + drag: create edge · Double-click: open in table</div>
 
       {node && (

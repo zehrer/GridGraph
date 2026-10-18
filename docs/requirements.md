@@ -99,13 +99,13 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 
 | ID | Requirement | Status |
 |---|---|---|
-| GR-1 | Canvas with force-directed layout; types drawn as squares, instances as circles in the type color. | Done |
-| GR-2 | Pan (drag background), zoom (wheel, buttons), fit to screen; frames the graph when opened. | Done |
+| GR-1 | Canvas with force-directed layout; types drawn as small colored squares, instances as circles in the type color. | Done |
+| GR-2 | Pan (drag background), zoom (wheel, buttons), fit to screen; the layout settles before the first frame and the view frames the graph when opened. | Done |
 | GR-3 | Drag nodes; Shift + drag from node to node creates a free edge (asks for the relation name). | Done |
 | GR-4 | Click a node to open the inspector (properties, incoming/outgoing edges, delete edge/node). | Done |
 | GR-5 | Double-click a node (or "Open in table") jumps to its row in the sheet. | Done |
 | GR-6 | Layout positions are not saved; the layout is recomputed. | Done (decision) |
-| GR-7 | Filter the graph by type; hide `typeOf` edges. | Idea |
+| GR-7 | **Hide type nodes** (◆ button): type nodes and `typeOf` edges are left out of drawing and layout, and a legend lists the types with color and count (click opens the sheet). Remembered per browser. Filtering by type is still an idea. | Done |
 
 ## 7. Databases, storage and files
 

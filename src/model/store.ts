@@ -18,9 +18,9 @@ export const rangeOf = (a: Cell, b: Cell) => ({
 });
 
 /** Personal display settings, kept per browser (not part of a database). */
-export interface Prefs { minRows: number; minCols: number }
+export interface Prefs { minRows: number; minCols: number; graphTypes: boolean }
 const PREFS_KEY = "gridgraph.prefs";
-const DEFAULT_PREFS: Prefs = { minRows: 20, minCols: 5 };
+const DEFAULT_PREFS: Prefs = { minRows: 20, minCols: 5, graphTypes: true };
 function loadPrefs(): Prefs {
   try {
     return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") };

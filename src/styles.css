@@ -211,3 +211,12 @@ main { flex: 1; min-height: 0; display: flex; }
 .dialog.about p { margin: 6px 0; line-height: 1.5; }
 .dialog .version { color: var(--muted); font-size: 12px; margin-top: 0; }
 .dialog a { color: var(--accent); }
+.graph-tools button.on { background: var(--accent-soft); color: #041e49; }
+.graph-legend {
+  position: absolute; left: 12px; bottom: 34px; display: flex; flex-direction: column; gap: 2px; padding: 8px;
+  background: rgb(255 255 255 / 92%); border-radius: 8px; box-shadow: 0 1px 3px rgb(60 64 67 / 25%);
+}
+.graph-legend button { display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 3px 6px; border-radius: 4px; text-align: left; }
+.graph-legend button:hover { background: var(--hover); }
+.graph-legend i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.graph-legend span { margin-left: auto; padding-left: 12px; color: var(--muted); font-size: 12px; }
