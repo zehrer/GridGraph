@@ -10,7 +10,7 @@ export function Header() {
   const [open, setOpen] = useState<number | null>(null);
   const s = useStore();
   const { sel } = s;
-  const hasRow = sel.row >= 2 && sel.row - 2 < instancesOf(s.graph, s.activeTypeId).length;
+  const hasRow = sel.row >= 1 && sel.row - 1 < instancesOf(s.graph, s.activeTypeId).length;
   const hasCol = sel.col >= 1 && sel.col <= columnsOf(s.graph, s.activeTypeId).length;
 
   const menus: { label: string; items: MenuItem[] }[] = [
@@ -32,6 +32,10 @@ export function Header() {
         { label: "Rückgängig", shortcut: `${MOD}Z`, disabled: !s.past.length, action: s.undo },
         { label: "Wiederholen", shortcut: `⇧${MOD}Z`, disabled: !s.future.length, action: s.redo },
         "-",
+        { label: "Ausschneiden", shortcut: `${MOD}X`, action: () => A.copySelection(true) },
+        { label: "Kopieren", shortcut: `${MOD}C`, action: () => A.copySelection() },
+        { label: "Einfügen", shortcut: `${MOD}V`, action: A.pasteFromClipboard },
+        "-",
         { label: "Zeile löschen", disabled: !hasRow, action: () => A.deleteRow(sel.row) },
         { label: "Spalte löschen", disabled: !hasCol, action: () => A.deleteColumn(sel.col) },
       ],
@@ -39,8 +43,8 @@ export function Header() {
     {
       label: "Einfügen",
       items: [
-        { label: "Zeile (Instanz)", action: () => s.select({ row: instancesOf(s.graph, s.activeTypeId).length + 2, col: 0 }) },
-        { label: "Spalte (Eigenschaft)", action: () => s.select({ row: 1, col: columnsOf(s.graph, s.activeTypeId).length + 1 }) },
+        { label: "Zeile (Instanz)", action: () => s.select({ row: instancesOf(s.graph, s.activeTypeId).length + 1, col: 0 }) },
+        { label: "Spalte (Eigenschaft)", action: () => s.select({ row: 0, col: columnsOf(s.graph, s.activeTypeId).length + 1 }) },
         { label: "Blatt (Typ)", action: A.newSheet },
       ],
     },
@@ -48,7 +52,7 @@ export function Header() {
       label: "Ansicht",
       items: [
         { label: "Tabelle", action: () => s.setView("sheet") },
-        { label: "Graph", action: () => s.setView("graph", A.currentSheet().rows[sel.row - 2]?.id ?? null) },
+        { label: "Graph", action: () => s.setView("graph", A.currentSheet().rows[sel.row - 1]?.id ?? null) },
       ],
     },
   ];

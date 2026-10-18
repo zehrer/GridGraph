@@ -4,8 +4,14 @@ import { addType, emptyGraph, typesOf } from "./graph";
 import type { Graph } from "./types";
 
 export type View = "sheet" | "graph";
-/** Sheet cell address: row 1 is the header row, rows ≥ 2 are instances; col 0 is the name column. */
+/** Sheet cell address: row 0 is the header row, rows ≥ 1 are instances; col 0 is the name column. */
 export interface Cell { row: number; col: number }
+
+/** Normalized rectangle spanned by two cells. */
+export const rangeOf = (a: Cell, b: Cell) => ({
+  r0: Math.min(a.row, b.row), r1: Math.max(a.row, b.row),
+  c0: Math.min(a.col, b.col), c1: Math.max(a.col, b.col),
+});
 
 interface State {
   graph: Graph;
@@ -13,7 +19,9 @@ interface State {
   future: Graph[];
   view: View;
   activeTypeId: string;
+  /** Active cell; together with `anchor` it spans the selected range. */
   sel: Cell;
+  anchor: Cell;
   focusNodeId: string | null;
   /** Sheet view options; key "" sorts by name. */
   sort: { key: string; asc: boolean } | null;
@@ -28,7 +36,8 @@ interface State {
   load: (g: Graph) => void;
   setView: (view: View, focusNodeId?: string | null) => void;
   setActiveType: (id: string) => void;
-  select: (sel: Cell) => void;
+  /** Moves the active cell; `extend` keeps the anchor to grow a range. */
+  select: (sel: Cell, extend?: boolean) => void;
 }
 
 const HISTORY = 100;
@@ -47,7 +56,8 @@ export const useStore = create<State>()((set, get) => {
     future: [],
     view: "sheet",
     activeTypeId: settle(initial, ""),
-    sel: { row: 2, col: 0 },
+    sel: { row: 1, col: 0 },
+    anchor: { row: 1, col: 0 },
     focusNodeId: null,
     sort: null,
     filter: "",
@@ -72,11 +82,14 @@ export const useStore = create<State>()((set, get) => {
     },
     load: (g) => {
       const { graph, past, activeTypeId } = get();
-      set({ graph: g, past: [...past, graph], future: [], activeTypeId: settle(g, activeTypeId), sel: { row: 2, col: 0 } });
+      set({ graph: g, past: [...past, graph], future: [], activeTypeId: settle(g, activeTypeId), sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 } });
     },
     setView: (view, focusNodeId = null) => set({ view, focusNodeId }),
-    setActiveType: (activeTypeId) => set({ activeTypeId, sel: { row: 2, col: 0 }, sort: null, filter: "" }),
-    select: (sel) => set({ sel: { row: Math.max(1, sel.row), col: Math.max(0, sel.col) } }),
+    setActiveType: (activeTypeId) => set({ activeTypeId, sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "" }),
+    select: (cell, extend = false) => {
+      const sel = { row: Math.max(0, cell.row), col: Math.max(0, cell.col) };
+      set(extend ? { sel } : { sel, anchor: sel });
+    },
   };
 });
 

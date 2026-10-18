@@ -1,15 +1,9 @@
-import { addInstance, addType, columnsOf, deleteNode, emptyGraph, instancesOf, newId, parseValue, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
+import { addInstance, addType, columnsOf, deleteNode, emptyGraph, guessType, instancesOf, newId, parseValue, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
 import { download, importText, toGraphML, toJSON } from "../model/io";
 import { sampleGraph } from "../model/sample";
-import { useStore, type Cell } from "../model/store";
+import { rangeOf, useStore, type Cell } from "../model/store";
+import { parseClipboard, toHTML, toTSV, type Matrix } from "../model/clipboard";
 import type { Column, Graph, GraphNode } from "../model/types";
-
-/** Column letters like a spreadsheet: A … Z, AA, AB … */
-export function colName(i: number): string {
-  let s = "";
-  for (i++; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s;
-  return s;
-}
 
 export interface SheetModel {
   type: GraphNode;
@@ -48,36 +42,104 @@ export const currentSheet = () => {
 /** Raw text of a cell, as shown in the formula bar and the cell editor. */
 export function cellText(g: Graph, m: SheetModel, { row, col }: Cell): string {
   const column = m.columns[col - 1];
-  if (row === 1) return col === 0 ? "Name" : (column?.label ?? "");
-  const node = m.rows[row - 2];
+  if (row === 0) return col === 0 ? "Name" : (column?.label ?? "");
+  const node = m.rows[row - 1];
   if (!node) return "";
   return col === 0 ? node.label : column ? rawValue(g, column, node.props[column.key]) : "";
 }
 
 /**
- * Writes user input into a cell. Header cells name columns; typing into an empty row
- * creates an instance and typing into an empty column creates a property.
+ * Writes a block of text into the sheet starting at `start`, as one undoable step.
+ * Header cells (row 0) name columns; values in empty columns or rows create new
+ * properties or instances. New columns get a type guessed from their values. When a
+ * multi-row block lands on an empty sheet, its first line is taken as the header.
+ * Returns the cell the block was actually written to.
  */
-export function commitCell({ row, col }: Cell, text: string) {
+export function writeCells(start: Cell, matrix: Matrix): Cell {
   const m = currentSheet();
-  const column = m.columns[col - 1];
-  const value = text.trim();
-  if (row === 1) {
-    if (col > 0 && value) useStore.getState().edit((g) => upsertColumn(g, m.type.id, column ? { ...column, label: value } : { key: newId("c"), label: value, type: "text" }));
-    return;
-  }
-  const node = m.rows[row - 2];
-  if (!node && !value) return;
+  if (start.row <= 1 && matrix.length > 1 && !m.columns.length && !m.rows.length) start = { row: 0, col: start.col };
+  const header = start.row === 0 ? 0 : -1;
+  const width = Math.max(...matrix.map((l) => l.length));
+  const cols = new Map<number, Column>();
+  let added = 0;
+
   useStore.getState().edit((g) => {
-    const id = node?.id ?? addInstance(g, m.type.id);
-    if (col === 0) {
-      g.nodes[id].label = value;
-      return;
+    for (let j = 0; j < width; j++) {
+      const c = start.col + j;
+      const label = header === 0 ? matrix[0][j]?.trim() : "";
+      const values = matrix.filter((_, i) => i !== header).map((l) => l[j] ?? "");
+      let col = m.columns[c - 1];
+      if (c === 0 || (!col && !label && !values.some((v) => v.trim()))) continue;
+      col = col ? { ...col, label: label || col.label } : { key: newId("c"), label: label || `Spalte ${m.columns.length + ++added}`, type: guessType(values) };
+      upsertColumn(g, m.type.id, col);
+      cols.set(c, col);
     }
-    const c = column ?? { key: newId("c"), label: colName(col), type: "text" };
-    if (!column) upsertColumn(g, m.type.id, c);
-    setProp(g, id, c.key, parseValue(g, c, value));
+    const newRows = new Map<number, string>();
+    matrix.forEach((line, i) => {
+      const r = start.row + i;
+      if (i === header) return;
+      let id = m.rows[r - 1]?.id ?? newRows.get(r);
+      if (!id) {
+        if (!line.some((v) => v.trim())) return;
+        newRows.set(r, (id = addInstance(g, m.type.id)));
+      }
+      line.forEach((text, j) => {
+        const c = start.col + j;
+        if (c === 0) g.nodes[id].label = text.trim();
+        else if (cols.has(c)) setProp(g, id, cols.get(c)!.key, parseValue(g, cols.get(c)!, text));
+      });
+    });
   });
+  return start;
+}
+
+export const commitCell = (cell: Cell, text: string) => writeCells(cell, [[text]]);
+
+// --- Clipboard ---
+
+/** Text of the selected range, row by row. */
+export function selectionMatrix(): Matrix {
+  const s = useStore.getState();
+  const m = currentSheet();
+  const { r0, r1, c0, c1 } = rangeOf(s.anchor, s.sel);
+  return Array.from({ length: r1 - r0 + 1 }, (_, i) => Array.from({ length: c1 - c0 + 1 }, (_, j) => cellText(s.graph, m, { row: r0 + i, col: c0 + j })));
+}
+
+export function clearSelection() {
+  const { anchor, sel } = useStore.getState();
+  const { r0, r1, c0, c1 } = rangeOf(anchor, sel);
+  // The header row keeps its names; clearing only applies to values.
+  const from = Math.max(r0, 1);
+  if (from <= r1) writeCells({ row: from, col: c0 }, Array.from({ length: r1 - from + 1 }, () => Array(c1 - c0 + 1).fill("")));
+}
+
+export function pasteMatrix(matrix: Matrix) {
+  const { anchor, sel, select } = useStore.getState();
+  const { r0, c0 } = rangeOf(anchor, sel);
+  const start = writeCells({ row: r0, col: c0 }, matrix);
+  select(start);
+  select({ row: start.row + matrix.length - 1, col: start.col + Math.max(...matrix.map((l) => l.length)) - 1 }, true);
+}
+
+export async function copySelection(cut = false) {
+  const m = selectionMatrix();
+  await navigator.clipboard.write([
+    new ClipboardItem({ "text/plain": new Blob([toTSV(m)], { type: "text/plain" }), "text/html": new Blob([toHTML(m)], { type: "text/html" }) }),
+  ]);
+  if (cut) clearSelection();
+}
+
+export async function pasteFromClipboard() {
+  try {
+    const items = await navigator.clipboard.read();
+    const read = async (type: string) => {
+      const item = items.find((i) => i.types.includes(type));
+      return item ? (await item.getType(type)).text() : "";
+    };
+    pasteMatrix(parseClipboard(await read("text/html"), await read("text/plain")));
+  } catch {
+    alert("Kein Zugriff auf die Zwischenablage – bitte ⌘V verwenden.");
+  }
 }
 
 export function setColumnType(col: number, type: Column["type"], targetTypeId?: string) {
@@ -100,7 +162,7 @@ export function sortBy(col: number, asc: boolean) {
 }
 
 export function deleteRow(row: number) {
-  const node = currentSheet().rows[row - 2];
+  const node = currentSheet().rows[row - 1];
   if (node) useStore.getState().edit((g) => deleteNode(g, node.id));
 }
 
@@ -129,7 +191,7 @@ export function showInSheet(nodeId: string) {
   s.setActiveType(n.isType ? n.id : n.typeId!);
   useStore.setState({ filter: "", view: "sheet" });
   const idx = currentSheet().rows.findIndex((r) => r.id === nodeId);
-  s.select({ row: idx + 2, col: 0 });
+  s.select({ row: idx + 1, col: 0 });
 }
 
 // --- File menu ---

@@ -142,12 +142,31 @@ export function parseValue(g: Graph, col: Column, raw: string): Value | undefine
   }
 }
 
-/** Text shown in the formula bar / cell editor. */
+const NUMBER = /^-?(\d{1,3}(\.\d{3})+|\d+)(,\d+)?$|^-?\d+(\.\d+)?$/;
+const DATE = /^(\d{1,2}\.\d{1,2}\.\d{4}|\d{4}-\d{2}-\d{2})$/;
+const BOOL = /^(ja|nein|true|false|wahr|falsch)$/i;
+
+/** Column type for pasted values: number, date or yes/no when every non-empty value fits. */
+export function guessType(values: string[]): ColumnType {
+  const vs = values.map((v) => v.trim()).filter(Boolean);
+  if (!vs.length) return "text";
+  for (const [re, type] of [[NUMBER, "number"], [DATE, "date"], [BOOL, "boolean"]] as const) {
+    if (vs.every((v) => re.test(v))) return type;
+  }
+  return "text";
+}
+
+/**
+ * Editable text of a value (formula bar, cell editor, clipboard). German notation without
+ * thousands separators, so `parseValue` and spreadsheet apps read it back unchanged.
+ */
 export function rawValue(g: Graph, col: Column, v: Value | undefined): string {
   if (v === undefined) return "";
   if (col.type === "relation" && typeof v === "string") return g.nodes[v]?.label ?? v;
   if (col.type === "boolean") return v ? "Ja" : "Nein";
-  return String(v);
+  if (col.type === "number" && typeof v === "number") return String(v).replace(".", ",");
+  const iso = col.type === "date" && typeof v === "string" && v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return iso ? `${iso[3]}.${iso[2]}.${iso[1]}` : String(v);
 }
 
 export function displayValue(g: Graph, col: Column, v: Value | undefined): string {

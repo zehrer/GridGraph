@@ -1,8 +1,9 @@
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { useStore, type Cell } from "../model/store";
+import { rangeOf, useStore, type Cell } from "../model/store";
 import { displayValue, nodeColor } from "../model/graph";
+import { parseClipboard, toHTML, toTSV } from "../model/clipboard";
 import type { Column, Graph, GraphNode } from "../model/types";
-import { cellText, colName, commitCell, sheetModel } from "./actions";
+import { cellText, clearSelection, commitCell, pasteMatrix, selectionMatrix, sheetModel } from "./actions";
 
 const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗" };
 const MOVES: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
@@ -11,7 +12,7 @@ interface Edit { cell: Cell; text: string; inBar?: boolean }
 type CellHandler = (e: MouseEvent, cell: Cell) => void;
 
 export function Sheet() {
-  const { graph, activeTypeId, sort, filter, sel, select } = useStore();
+  const { graph, activeTypeId, sort, filter, sel, anchor, select } = useStore();
   const m = useMemo(() => sheetModel(graph, activeTypeId, { sort, filter }), [graph, activeTypeId, sort, filter]);
   const [edit, setEditState] = useState<Edit | null>(null);
   const editRef = useRef<Edit | null>(null);
@@ -19,11 +20,12 @@ export function Sheet() {
   const [addCount, setAddCount] = useState("1000");
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const nRows = Math.max(m.rows.length + 2, 20) + extraRows;
+  const nRows = Math.max(m.rows.length + 1, 20) + extraRows;
   const nCols = Math.max(m.columns.length + 2, 6);
+  const range = rangeOf(anchor, sel);
   const setEdit = (e: Edit | null) => setEditState((editRef.current = e));
-  const move = (dr: number, dc: number, from = sel) =>
-    select({ row: Math.min(from.row + dr, nRows), col: Math.min(from.col + dc, nCols - 1) });
+  const move = (dr: number, dc: number, from = sel, extend = false) =>
+    select({ row: Math.min(from.row + dr, nRows), col: Math.min(from.col + dc, nCols - 1) }, extend);
 
   /**
    * Ends editing; the ref guard makes Enter + the following blur commit only once.
@@ -41,17 +43,51 @@ export function Sheet() {
   };
 
   // Stable handler for memoized rows; reads the latest state through the ref.
-  const latest = useRef({ edit, m, graph });
-  latest.current = { edit, m, graph };
+  const latest = useRef({ m, graph });
+  latest.current = { m, graph };
+  const dragging = useRef(false);
   const onCell = useRef<CellHandler>((e, cell) => {
     const { m, graph } = latest.current;
+    const { select } = useStore.getState();
     if (e.type === "dblclick") return setEdit({ cell, text: cellText(graph, m, cell) });
-    useStore.getState().select(cell);
+    if (e.type === "mouseenter") return dragging.current && select(cell, true);
+    dragging.current = true;
+    select(cell, e.shiftKey);
     const column = m.columns[cell.col - 1];
     if ((e.target as HTMLElement).tagName === "INPUT" && column?.type === "boolean") {
       commitCell(cell, cellText(graph, m, cell) === "Ja" ? "nein" : "ja");
     }
   }).current;
+
+  useEffect(() => {
+    const up = () => (dragging.current = false);
+    // Clipboard events only reach the document; handle them while the grid has focus.
+    const active = () => document.activeElement === gridRef.current && !editRef.current;
+    const copy = (e: ClipboardEvent, cut = false) => {
+      if (!active()) return;
+      e.preventDefault();
+      const matrix = selectionMatrix();
+      e.clipboardData?.setData("text/plain", toTSV(matrix));
+      e.clipboardData?.setData("text/html", toHTML(matrix));
+      if (cut) clearSelection();
+    };
+    const cut = (e: ClipboardEvent) => copy(e, true);
+    const paste = (e: ClipboardEvent) => {
+      if (!active() || !e.clipboardData) return;
+      e.preventDefault();
+      pasteMatrix(parseClipboard(e.clipboardData.getData("text/html"), e.clipboardData.getData("text/plain")));
+    };
+    window.addEventListener("mouseup", up);
+    document.addEventListener("copy", copy);
+    document.addEventListener("cut", cut);
+    document.addEventListener("paste", paste);
+    return () => {
+      window.removeEventListener("mouseup", up);
+      document.removeEventListener("copy", copy);
+      document.removeEventListener("cut", cut);
+      document.removeEventListener("paste", paste);
+    };
+  }, []);
 
   useEffect(() => {
     gridRef.current?.querySelector(`[data-cell="${sel.row}:${sel.col}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -63,14 +99,16 @@ export function Sheet() {
     const delta = e.key === "Tab" ? [0, e.shiftKey ? -1 : 1] : e.key === "Enter" && e.shiftKey ? [-1, 0] : MOVES[e.key];
     if (delta) {
       e.preventDefault();
-      move(delta[0], delta[1]);
+      move(delta[0], delta[1], sel, e.shiftKey && e.key in MOVES);
     } else if (e.key === "Enter" || e.key === "F2") {
       e.preventDefault();
+      select(sel);
       setEdit({ cell: sel, text: cellText(graph, m, sel) });
     } else if (e.key === "Backspace" || e.key === "Delete") {
-      commitCell(sel, "");
+      clearSelection();
     } else if (e.key.length === 1) {
       e.preventDefault();
+      select(sel);
       setEdit({ cell: sel, text: e.key });
     }
   };
@@ -89,7 +127,7 @@ export function Sheet() {
       className="cell-editor"
       autoFocus
       value={edit.text}
-      list={edit.cell.row > 1 && editColumn?.type === "relation" ? "relation-options" : undefined}
+      list={edit.cell.row > 0 && editColumn?.type === "relation" ? "relation-options" : undefined}
       onChange={(e) => setEdit({ ...edit, text: e.target.value })}
       onKeyDown={onEditorKey}
       onBlur={() => finish(true)}
@@ -97,10 +135,30 @@ export function Sheet() {
   );
   const target = editColumn?.type === "relation" && editColumn.targetTypeId;
 
+  const rowProps = (row: number) => ({
+    row,
+    node: row > 0 ? m.rows[row - 1] : undefined,
+    columns: m.columns,
+    nCols,
+    graph,
+    selCol: sel.row === row ? sel.col : -1,
+    hlCol: row === 0 ? sel.col : -1,
+    rangeCols: row >= range.r0 && row <= range.r1 && (range.r0 !== range.r1 || range.c0 !== range.c1) ? `${range.c0}:${range.c1}` : "",
+    editCol: edit?.cell.row === row ? edit.cell.col : -1,
+    editText: edit?.cell.row === row ? edit.text : undefined,
+    editor: edit?.cell.row === row ? editor : null,
+    onCell,
+  });
+
+  const title = sel.col === 0 ? "Name" : (m.columns[sel.col - 1]?.label ?? "neue Spalte");
+  const multi = range.r0 !== range.r1 || range.c0 !== range.c1;
+
   return (
     <div className="sheet">
       <div className="formula-bar">
-        <div className="name-box">{colName(sel.col) + sel.row}</div>
+        <div className="name-box" title={title}>
+          {multi ? `${range.r1 - range.r0 + 1} × ${range.c1 - range.c0 + 1}` : sel.row === 0 ? `${title} (Kopf)` : `${title} ${sel.row}`}
+        </div>
         <span className="fx">fx</span>
         <input
           value={edit ? edit.text : cellText(graph, m, sel)}
@@ -113,32 +171,12 @@ export function Sheet() {
       <div className="grid-scroll" ref={gridRef} tabIndex={0} onKeyDown={onGridKey}>
         <table className="grid">
           <thead>
-            <tr>
-              <th className="corner" />
-              {Array.from({ length: nCols }, (_, c) => (
-                <th key={c} className={c === sel.col ? "hl" : ""}>{colName(c)}</th>
-              ))}
-            </tr>
+            <Row {...rowProps(0)} />
           </thead>
           <tbody>
-            {Array.from({ length: nRows }, (_, i) => {
-              const row = i + 1;
-              return (
-                <Row
-                  key={row}
-                  row={row}
-                  node={row > 1 ? m.rows[row - 2] : undefined}
-                  columns={m.columns}
-                  nCols={nCols}
-                  graph={graph}
-                  selCol={sel.row === row ? sel.col : -1}
-                  editCol={edit?.cell.row === row ? edit.cell.col : -1}
-                  editText={edit?.cell.row === row ? edit.text : undefined}
-                  editor={edit?.cell.row === row ? editor : null}
-                  onCell={onCell}
-                />
-              );
-            })}
+            {Array.from({ length: nRows }, (_, i) => (
+              <Row key={i + 1} {...rowProps(i + 1)} />
+            ))}
           </tbody>
         </table>
         <div className="add-rows">
@@ -163,25 +201,33 @@ interface RowProps {
   nCols: number;
   graph: Graph;
   selCol: number;
+  /** Header row only: column of the active cell, highlighted. */
+  hlCol: number;
+  /** "c0:c1" when this row lies in a multi-cell selection (a string keeps memo comparisons cheap). */
+  rangeCols: string;
   editCol: number;
   editText?: string;
   editor: React.ReactNode;
   onCell: CellHandler;
 }
 
-const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, editCol, editText, editor, onCell }: RowProps) {
+/** One sheet row; row 0 is the header with the property names. */
+const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, hlCol, rangeCols, editCol, editText, editor, onCell }: RowProps) {
+  const [c0, c1] = rangeCols ? rangeCols.split(":").map(Number) : [-1, -1];
   return (
-    <tr className={row === 1 ? "header-row" : ""}>
-      <th className={selCol >= 0 ? "hl" : ""}>{row}</th>
+    <tr className={row === 0 ? "header-row" : ""}>
+      <th className={row === 0 ? "corner" : selCol >= 0 || c0 >= 0 ? "hl" : ""}>{row || ""}</th>
       {Array.from({ length: nCols }, (_, col) => {
         const column = columns[col - 1];
         const cell = { row, col };
+        const cls = [col === selCol && "sel", col >= c0 && col <= c1 && "in-range", col === hlCol && "hl", column?.type === "number" && row > 0 && "num"];
         return (
           <td
             key={col}
             data-cell={`${row}:${col}`}
-            className={[col === selCol && "sel", column?.type === "number" && row > 1 && "num"].filter(Boolean).join(" ")}
+            className={cls.filter(Boolean).join(" ")}
             onMouseDown={(e) => onCell(e, cell)}
+            onMouseEnter={(e) => onCell(e, cell)}
             onDoubleClick={(e) => onCell(e, cell)}
           >
             {col === editCol ? (editor ?? editText) : <CellContent row={row} col={col} node={node} column={column} graph={graph} />}
@@ -193,7 +239,7 @@ const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, editCo
 });
 
 function CellContent({ row, col, node, column, graph }: { row: number; col: number; node?: GraphNode; column?: Column; graph: Graph }) {
-  if (row === 1) {
+  if (row === 0) {
     if (col === 0) return <>Name</>;
     return column ? <>{TYPE_ICON[column.type] && <i className="type-icon">{TYPE_ICON[column.type]}</i>}{column.label}</> : null;
   }
