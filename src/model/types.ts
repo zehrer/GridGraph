@@ -1,4 +1,5 @@
-export type ColumnType = "text" | "number" | "date" | "boolean" | "relation";
+/** `autonumber` is read-only: every new instance gets the next number, numbers are never reused. */
+export type ColumnType = "text" | "number" | "date" | "boolean" | "relation" | "autonumber";
 export type Value = string | number | boolean;
 
 export interface Column {
@@ -7,6 +8,8 @@ export interface Column {
   type: ColumnType;
   /** For relation columns: the type whose instances can be referenced. */
   targetTypeId?: string;
+  /** For autonumber columns: the number the next instance gets. */
+  next?: number;
 }
 
 /**
@@ -21,6 +24,8 @@ export interface GraphNode {
   typeId?: string;
   color?: string;
   columns?: Column[];
+  /** Types only: header of the name column (defaults to "Name"). */
+  nameLabel?: string;
   props: Record<string, Value>;
 }
 

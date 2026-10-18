@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseClipboard, parseTSV, toTSV } from "../model/clipboard";
 import { guessType } from "../model/graph";
 import { setLocale } from "../model/locale";
 import { emptyGraph } from "../model/graph";
 import { newDbInfo, useStore } from "../model/store";
-import { cellText, currentSheet, pasteMatrix, selectionMatrix, writeCells } from "./actions";
+import { cellText, currentSheet, deleteRow, pasteMatrix, selectionMatrix, setColumnType, writeCells } from "./actions";
 
 beforeEach(() => setLocale("en-US"));
 
@@ -47,5 +47,25 @@ describe("writing cells", () => {
     const m = currentSheet();
     expect(m.rows.map((r) => cellText(useStore.getState().graph, m, { row: m.rows.indexOf(r) + 1, col: 1 }))).toEqual(["Munich", "Hamburg"]);
     expect(m.rows[1].label).toBe("");
+  });
+
+  it("renames the name column through its header cell, also when pasting", () => {
+    writeCells({ row: 0, col: 0 }, [["Product"]]);
+    expect(cellText(useStore.getState().graph, currentSheet(), { row: 0, col: 0 })).toBe("Product");
+    pasteMatrix(parseTSV("Item\tPrice\nScrew\t0.15"));
+    expect(currentSheet().type.nameLabel).toBe("Item");
+  });
+
+  it("numbers rows in an autonumber column and never reuses numbers", () => {
+    writeCells({ row: 0, col: 0 }, [["Name", "ID"], ["A", "x"], ["B", ""]]);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    setColumnType(1, "autonumber");
+    expect(window.confirm).toHaveBeenCalledOnce();
+    const ids = () => currentSheet().rows.map((r) => r.props[currentSheet().columns[0].key]);
+    expect(ids()).toEqual([1, 2]);
+    deleteRow(2);
+    writeCells({ row: 2, col: 0 }, [["C", "99"]]);
+    expect(ids()).toEqual([1, 3]);
+    expect(currentSheet().columns[0].next).toBe(4);
   });
 });

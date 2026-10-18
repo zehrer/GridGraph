@@ -1,4 +1,4 @@
-import { addInstance, addType, columnsOf, deleteNode, emptyGraph, guessType, instancesOf, newId, parseValue, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
+import { addInstance, addType, columnsOf, deleteNode, emptyGraph, guessType, instancesOf, nameLabel, newId, numberColumn, parseValue, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
 import { download, importText, toGraphML, toJSON } from "../model/io";
 import { sampleGraph } from "../model/sample";
 import { deleteDatabase, openNew } from "../model/persist";
@@ -43,7 +43,7 @@ export const currentSheet = () => {
 /** Raw text of a cell, as shown in the formula bar and the cell editor. */
 export function cellText(g: Graph, m: SheetModel, { row, col }: Cell): string {
   const column = m.columns[col - 1];
-  if (row === 0) return col === 0 ? "Name" : (column?.label ?? "");
+  if (row === 0) return col === 0 ? nameLabel(m.type) : (column?.label ?? "");
   const node = m.rows[row - 1];
   if (!node) return "";
   return col === 0 ? node.label : column ? rawValue(g, column, node.props[column.key]) : "";
@@ -70,6 +70,7 @@ export function writeCells(start: Cell, matrix: Matrix): Cell {
       const label = header === 0 ? matrix[0][j]?.trim() : "";
       const values = matrix.filter((_, i) => i !== header).map((l) => l[j] ?? "");
       let col = m.columns[c - 1];
+      if (c === 0 && label) g.nodes[m.type.id].nameLabel = label;
       if (c === 0 || (!col && !label && !values.some((v) => v.trim()))) continue;
       col = col ? { ...col, label: label || col.label } : { key: newId("c"), label: label || `Column ${m.columns.length + ++added}`, type: guessType(values) };
       upsertColumn(g, m.type.id, col);
@@ -87,7 +88,7 @@ export function writeCells(start: Cell, matrix: Matrix): Cell {
       line.forEach((text, j) => {
         const c = start.col + j;
         if (c === 0) g.nodes[id].label = text.trim();
-        else if (cols.has(c)) setProp(g, id, cols.get(c)!.key, parseValue(g, cols.get(c)!, text));
+        else if (cols.has(c) && cols.get(c)!.type !== "autonumber") setProp(g, id, cols.get(c)!.key, parseValue(g, cols.get(c)!, text));
       });
     });
   });
@@ -147,9 +148,15 @@ export function setColumnType(col: number, type: Column["type"], targetTypeId?: 
   const m = currentSheet();
   const column = m.columns[col - 1];
   if (!column) return;
+  const rows = instancesOf(useStore.getState().graph, m.type.id);
+  if (type === "autonumber") {
+    const filled = rows.some((n) => n.props[column.key] !== undefined);
+    if (!filled || confirm(`Replace the values in "${column.label}" with running numbers?`)) useStore.getState().edit((g) => numberColumn(g, m.type.id, column));
+    return;
+  }
   useStore.getState().edit((g) => {
     // Relation cells store node ids; convert existing values by label (and back).
-    for (const n of m.rows) {
+    for (const n of rows) {
       const text = rawValue(g, column, n.props[column.key]);
       setProp(g, n.id, column.key, parseValue(g, { ...column, type, targetTypeId }, text));
     }

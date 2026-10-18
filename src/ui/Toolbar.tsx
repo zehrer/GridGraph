@@ -7,6 +7,7 @@ const TYPES = [
   ["number", "Number"],
   ["date", "Date"],
   ["boolean", "Yes / No"],
+  ["autonumber", "Auto number (ID)"],
 ] as const;
 
 export function Toolbar() {

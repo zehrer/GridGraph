@@ -1,11 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { rangeOf, useStore, type Cell } from "../model/store";
-import { displayValue, nodeColor } from "../model/graph";
+import { displayValue, nameLabel, nodeColor } from "../model/graph";
 import { parseClipboard, toHTML, toTSV } from "../model/clipboard";
 import type { Column, Graph, GraphNode } from "../model/types";
-import { cellText, clearSelection, commitCell, pasteMatrix, selectionMatrix, sheetModel } from "./actions";
+import { cellText, clearSelection, commitCell, pasteMatrix, selectionMatrix, sheetModel, type SheetModel } from "./actions";
 
-const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗" };
+const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗", autonumber: "№" };
+const isNumeric = (c?: Column) => c?.type === "number" || c?.type === "autonumber";
 const MOVES: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
 
 interface Edit { cell: Cell; text: string; inBar?: boolean }
@@ -24,7 +25,7 @@ export function Sheet() {
   const nCols = Math.max(m.columns.length + 2, 6);
   const range = rangeOf(anchor, sel);
   const setEdit = (e: Edit | null) => setEditState((editRef.current = e));
-  const move = (dr: number, dc: number, from = sel, extend = false) =>
+  const move = (dr: number, dc: number, from = useStore.getState().sel, extend = false) =>
     select({ row: Math.min(from.row + dr, nRows), col: Math.min(from.col + dc, nCols - 1) }, extend);
 
   /**
@@ -49,7 +50,7 @@ export function Sheet() {
   const onCell = useRef<CellHandler>((e, cell) => {
     const { m, graph } = latest.current;
     const { select } = useStore.getState();
-    if (e.type === "dblclick") return setEdit({ cell, text: cellText(graph, m, cell) });
+    if (e.type === "dblclick") return !readOnly(m, cell) && setEdit({ cell, text: cellText(graph, m, cell) });
     if (e.type === "mouseenter") return dragging.current && select(cell, true);
     dragging.current = true;
     select(cell, e.shiftKey);
@@ -96,11 +97,15 @@ export function Sheet() {
 
   const onGridKey = (e: KeyboardEvent) => {
     if (edit || e.metaKey || e.ctrlKey || e.altKey) return;
+    // Read the selection from the store: a click right before the key may not have re-rendered yet.
+    const { sel } = useStore.getState();
     const delta = e.key === "Tab" ? [0, e.shiftKey ? -1 : 1] : e.key === "Enter" && e.shiftKey ? [-1, 0] : MOVES[e.key];
     if (delta) {
       e.preventDefault();
       move(delta[0], delta[1], sel, e.shiftKey && e.key in MOVES);
-    } else if (e.key === "Enter" || e.key === "F2") {
+    } else if (readOnly(m, sel) && e.key.length === 1) {
+      e.preventDefault();
+    } else if ((e.key === "Enter" || e.key === "F2") && !readOnly(m, sel)) {
       e.preventDefault();
       select(sel);
       setEdit({ cell: sel, text: cellText(graph, m, sel) });
@@ -138,6 +143,7 @@ export function Sheet() {
   const rowProps = (row: number) => ({
     row,
     node: row > 0 ? m.rows[row - 1] : undefined,
+    type: m.type,
     columns: m.columns,
     nCols,
     graph,
@@ -150,7 +156,7 @@ export function Sheet() {
     onCell,
   });
 
-  const title = sel.col === 0 ? "Name" : (m.columns[sel.col - 1]?.label ?? "new column");
+  const title = sel.col === 0 ? nameLabel(m.type) : (m.columns[sel.col - 1]?.label ?? "new column");
   const multi = range.r0 !== range.r1 || range.c0 !== range.c1;
 
   return (
@@ -162,6 +168,7 @@ export function Sheet() {
         <span className="fx">fx</span>
         <input
           value={edit ? edit.text : cellText(graph, m, sel)}
+          readOnly={readOnly(m, sel)}
           onChange={(e) => setEdit({ cell: edit?.cell ?? sel, text: e.target.value, inBar: true })}
           onKeyDown={onEditorKey}
           onBlur={() => editRef.current?.inBar && finish(true)}
@@ -197,6 +204,7 @@ export function Sheet() {
 interface RowProps {
   row: number;
   node?: GraphNode;
+  type: GraphNode;
   columns: Column[];
   nCols: number;
   graph: Graph;
@@ -212,7 +220,7 @@ interface RowProps {
 }
 
 /** One sheet row; row 0 is the header with the property names. */
-const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, hlCol, rangeCols, editCol, editText, editor, onCell }: RowProps) {
+const Row = memo(function Row({ row, node, type, columns, nCols, graph, selCol, hlCol, rangeCols, editCol, editText, editor, onCell }: RowProps) {
   const [c0, c1] = rangeCols ? rangeCols.split(":").map(Number) : [-1, -1];
   return (
     <tr className={row === 0 ? "header-row" : ""}>
@@ -220,7 +228,7 @@ const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, hlCol,
       {Array.from({ length: nCols }, (_, col) => {
         const column = columns[col - 1];
         const cell = { row, col };
-        const cls = [col === selCol && "sel", col >= c0 && col <= c1 && "in-range", col === hlCol && "hl", column?.type === "number" && row > 0 && "num"];
+        const cls = [col === selCol && "sel", col >= c0 && col <= c1 && "in-range", col === hlCol && "hl", isNumeric(column) && row > 0 && "num"];
         return (
           <td
             key={col}
@@ -230,7 +238,7 @@ const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, hlCol,
             onMouseEnter={(e) => onCell(e, cell)}
             onDoubleClick={(e) => onCell(e, cell)}
           >
-            {col === editCol ? (editor ?? editText) : <CellContent row={row} col={col} node={node} column={column} graph={graph} />}
+            {col === editCol ? (editor ?? editText) : <CellContent row={row} col={col} node={node} column={column} graph={graph} type={type} />}
           </td>
         );
       })}
@@ -238,9 +246,12 @@ const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, hlCol,
   );
 });
 
-function CellContent({ row, col, node, column, graph }: { row: number; col: number; node?: GraphNode; column?: Column; graph: Graph }) {
+/** Auto numbers are assigned by the app and cannot be typed over. */
+const readOnly = (m: SheetModel, cell: Cell) => cell.row > 0 && m.columns[cell.col - 1]?.type === "autonumber";
+
+function CellContent({ row, col, node, column, graph, type }: { row: number; col: number; node?: GraphNode; column?: Column; graph: Graph; type?: GraphNode }) {
   if (row === 0) {
-    if (col === 0) return <>Name</>;
+    if (col === 0) return <>{nameLabel(type)}</>;
     return column ? <>{TYPE_ICON[column.type] && <i className="type-icon">{TYPE_ICON[column.type]}</i>}{column.label}</> : null;
   }
   if (!node) return null;

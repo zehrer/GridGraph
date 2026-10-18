@@ -67,8 +67,23 @@ export function addType(g: Graph, label?: string): string {
 export function addInstance(g: Graph, typeId: string, label = ""): string {
   const id = newId("inst");
   g.nodes[id] = { id, label, typeId, props: {} };
+  for (const col of g.nodes[typeId]?.columns ?? []) {
+    if (col.type === "autonumber") {
+      col.next ??= 1;
+      g.nodes[id].props[col.key] = col.next++;
+    }
+  }
   return id;
 }
+
+/** Turns a column into an autonumber column, numbering existing instances in creation order. */
+export function numberColumn(g: Graph, typeId: string, col: Column) {
+  let next = 1;
+  for (const inst of instancesOf(g, typeId)) inst.props[col.key] = next++;
+  upsertColumn(g, typeId, { key: col.key, label: col.label, type: "autonumber", next });
+}
+
+export const nameLabel = (type: GraphNode | undefined) => type?.nameLabel || "Name";
 
 export function setProp(g: Graph, nodeId: string, key: string, value: Value | undefined) {
   const n = g.nodes[nodeId];

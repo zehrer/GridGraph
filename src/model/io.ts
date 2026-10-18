@@ -15,7 +15,7 @@ function fromParts(nodeList: NodeInput[], edgeList: EdgeInput[]): Graph {
     g.nodes[n.id] = {
       id: n.id,
       label: n.label ?? n.id,
-      ...(n.isType && { isType: true, columns: (n.columns ?? n.typeProperties ?? []).map(({ key, label, type, targetTypeId }) => ({ key, label: label ?? key, type: type ?? "text", ...(targetTypeId && { targetTypeId }) })) }),
+      ...(n.isType && { isType: true, columns: (n.columns ?? n.typeProperties ?? []).map(({ key, label, type, targetTypeId, next }) => ({ key, label: label ?? key, type: type ?? "text", ...(targetTypeId && { targetTypeId }), ...(next && { next }) })), ...(n.nameLabel && { nameLabel: n.nameLabel }) }),
       ...(n.typeId && { typeId: n.typeId }),
       ...(n.color && { color: n.color }),
       props: { ...(n.props ?? n.properties) },
@@ -47,7 +47,7 @@ export function fromJSON(text: string): Graph {
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => `&${{ "&": "amp", "<": "lt", ">": "gt", '"': "quot", "'": "apos" }[c]};`);
 
-const NODE_KEYS = ["label", "isType", "typeId", "color", "columns", "props"] as const;
+const NODE_KEYS = ["label", "isType", "typeId", "color", "nameLabel", "columns", "props"] as const;
 const EDGE_KEYS = ["relation", "kind"] as const;
 
 /** GraphML for Gephi, yEd, Cytoscape. All edges (including derived ones) are written out. */
@@ -89,8 +89,8 @@ export function fromGraphML(text: string): Graph {
   };
 
   const nodes = [...doc.querySelectorAll("node")].map((el): NodeInput => {
-    const { label, isType, typeId, color, columns, props, ...rest } = readData(el);
-    return { id: el.id, label, isType: isType === "true", typeId, color, columns: json(columns), props: json(props) ?? rest };
+    const { label, isType, typeId, color, nameLabel, columns, props, ...rest } = readData(el);
+    return { id: el.id, label, isType: isType === "true", typeId, color, nameLabel, columns: json(columns), props: json(props) ?? rest };
   });
   const edges = [...doc.querySelectorAll("edge")].map((el): EdgeInput => {
     const d = readData(el);

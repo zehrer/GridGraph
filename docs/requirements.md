@@ -27,11 +27,13 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | DM-2 | A **type** is a node (`isType`) that owns an ordered list of columns (key, label, data type). | Done |
 | DM-3 | An **instance** is a node whose `typeId` points to its type. The `typeOf` edge is derived from `typeId`, not stored. | Done |
 | DM-4 | Instances hold properties as key → value (text, number, ISO date, boolean, node id). | Done |
-| DM-5 | Column data types: Text, Number, Date, Yes/No, **Link to type** (relation). | Done |
+| DM-5 | Column data types: Text, Number, Date, Yes/No, **Link to type** (relation), **Auto number**. | Done |
 | DM-6 | A relation property stores the id of the target node; the edge (labelled with the column name) is derived from it. | Done |
 | DM-7 | **Free edges** (any node → any node, with a relation name) are stored separately. | Done |
 | DM-8 | Properties that no column declares appear as extra columns, with a data type inferred from the value. | Done |
 | DM-9 | Deleting a type deletes its instances; references to deleted nodes are removed; relation columns pointing to a deleted type become text. | Done |
+| DM-10 | Every node has an internal, immutable unique id; links refer to it, so renaming never breaks a link. Row numbers in the sheet are positions, not ids. | Done |
+| DM-11 | **Auto number** column (optional, per type): read-only running number assigned when an instance is created; numbers are never reused after a delete. Converting a column to Auto number numbers the existing instances in creation order (after confirmation if it has values). | Done |
 
 ## 4. Table view (sheet)
 
@@ -39,7 +41,8 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 |---|---|---|
 | SH-1 | One **sheet tab per type** at the bottom: add (+), list all (≡), rename (double-click), color, delete. | Done |
 | SH-2 | The **header row** (row "0", sticky) shows the property names; there are no A/B/C column letters. Typing a name into an empty header cell creates a column. | Done |
-| SH-3 | Column 1 is the instance **Name**; rows 1… are instances. At least 20 rows and 6 columns are shown; "Add N more rows at the bottom" adds empty rows. | Done |
+| SH-3 | Column 1 is the instance's **name** (primary field: graph label, link matching, search). Its header can be renamed per type (default "Name"); pasting a header row renames it too. | Done |
+| SH-3a | Rows 1… are instances. At least 20 rows and 6 columns are shown; "Add N more rows at the bottom" adds empty rows. | Done |
 | SH-4 | Typing into an empty row creates an instance; typing into an empty column creates a property. | Done |
 | SH-5 | Editing: start typing, Enter, F2 or double-click; Enter/Tab confirm and move; Esc cancels; Delete/Backspace clears. | Done |
 | SH-6 | Arrow keys, Tab and Enter move the active cell. | Done |
@@ -116,9 +119,10 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | 2026-10-18 | Copy/paste via TSV + HTML table for compatibility with Numbers and Google Sheets. |
 | 2026-10-18 | Multiple databases per browser, each with a name; the File menu lists them. |
 | 2026-10-18 | UI language is English only; number and date notation follows the browser locale. |
+| 2026-10-18 | No mandatory ID column: internal ids already guarantee uniqueness. A visible running number is an optional "Auto number" column type. The name column stays the primary field but can be renamed. |
 
 ## 10. Open questions
 
-- Should a sheet support several instances with the same name, or should names be unique per type (relations are matched by name)?
+- Should a sheet support several instances with the same name, or should names be unique per type (relations are matched by name)? An Auto number column gives a readable unique key, but link cells still match by name.
 - Should column keys stay internal ids, or follow the column name (affects JSON export readability)?
 - Should free edges be editable in the table (e.g. an "edges" sheet)?
