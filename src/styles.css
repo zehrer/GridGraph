@@ -205,3 +205,9 @@ main { flex: 1; min-height: 0; display: flex; }
 .dialog footer button:hover { background: #e8f0fe; }
 .dialog footer .primary { background: var(--accent); color: #fff; }
 .dialog footer .primary:hover { background: #0842a0; }
+.dialog.about { width: min(460px, calc(100vw - 32px)); }
+.dialog.about h3 { margin-bottom: 2px; }
+.dialog.about h4 { margin: 18px 0 4px; font-size: 14px; font-weight: 500; }
+.dialog.about p { margin: 6px 0; line-height: 1.5; }
+.dialog .version { color: var(--muted); font-size: 12px; margin-top: 0; }
+.dialog a { color: var(--accent); }

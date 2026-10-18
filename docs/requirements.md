@@ -61,9 +61,27 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | SH-16 | **Hide / show** columns: hidden columns leave a ⋮ marker in the header to show them again; View → Show hidden columns shows all. | Done |
 | SH-17 | **Wrap text** per column; wrapped rows grow in height. | Done |
 | SH-18 | **Add row** (toolbar, Insert menu, context menu) appends an instance and selects its name cell; **Delete row(s)** removes the selected rows. Clicking an ID selects the row. | Done |
-| SH-19 | **Footer row** (sticky): row count under the ID; per column a choice of None, Sum, Average, Min, Max, Count, Empty (Min/Max also for dates). | Done |
+| SH-19 | **Footer row** (sticky): row count under the ID; per column a choice of None, Sum, Average, Min, Max, Count, Empty (Min/Max also for dates; numbers stored as text are counted too). | Done |
 | SH-20 | Context menu (right click) on cells and row numbers: add/delete rows, cut, copy, paste. | Done |
 | SH-21 | Reorder rows by drag and drop (manual order instead of ID order). | Idea |
+
+## 4a. Format menu
+
+| ID | Requirement | Status |
+|---|---|---|
+| FM-1 | A **Format** menu applies to the selected column(s): data type (Text, Yes/No, Number, Date), number format, date format, wrap text. Examples show how each format looks. | Done |
+| FM-2 | Date formats: Automatic (browser locale), **DD.MM.YYYY**, MM/DD/YYYY, YYYY-MM-DD, DD/MM/YYYY, D MMM YYYY. A column's date format is used for display, editing and copy/paste; the stored value stays an ISO date. | Done |
+| FM-3 | Dates written with dots are always read as day.month.year, whatever the browser locale. A new date column typed with dots gets DD.MM.YYYY. | Done |
+| FM-4 | Number formats: Automatic, Integer, 2 decimals, Euro, Dollar, Percent (edited as "12.5%", stored as 0.125). The footer uses the column's format. | Done |
+| FM-5 | Choosing a number or date format on a text column converts it, reading the values with the chosen format. | Done |
+| FM-6 | An empty text column (e.g. after typing its heading first) takes the type of the first values typed into it. | Done |
+
+## 4b. Help
+
+| ID | Requirement | Status |
+|---|---|---|
+| HL-1 | **Help → About GridGraph** shows the version and build (commit, date) and explains that data is stored only in this browser (IndexedDB), never on a server; that it is not synced and is lost when site data is cleared; and how to back it up (Export as JSON). | Done |
+| HL-2 | Link to the documentation on GitHub. | Done |
 
 ## 5. Copy and paste
 
@@ -131,6 +149,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | 2026-10-18 | The ID is built in: every instance gets a running number per type, shown as the first, read-only column (replaces the short-lived "Auto number" column type). |
 | 2026-10-18 | The name is a normal column marked as the name column (`nameKey`), not a fixed first column; older data is migrated on load. |
 | 2026-10-18 | No separate row numbers: the ID column is the row header. Display settings (minimum rows/columns) are personal and live in the browser, not in the database. |
+| 2026-10-18 | Columns carry an optional display format (date/number). Dates with dots are day.month.year in every locale, since no locale writes month first with dots. |
 | 2026-10-18 | A pasted table only brings its own header row into an empty sheet when it has several columns with text headings, so a pasted list of names keeps its first entry. |
 
 ## 10. Open questions

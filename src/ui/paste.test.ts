@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseClipboard, parseTSV, toTSV } from "../model/clipboard";
-import { guessType, normalize } from "../model/graph";
+import { displayValue, guessType, normalize } from "../model/graph";
 import { summarize } from "../model/summary";
 import { setLocale } from "../model/locale";
 import { emptyGraph } from "../model/graph";
 import { newDbInfo, useStore } from "../model/store";
-import { addRow, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
+import { addRow, commitCell, formatColumns, renumberIds, cellText, currentSheet, deleteColumn, deleteRows, hideColumn, moveColumnTo, nameOf, pasteMatrix, selectionMatrix, setNameColumn, unhideColumns, writeCells } from "./actions";
 
 beforeEach(() => setLocale("en-US"));
 
@@ -95,6 +95,23 @@ describe("writing cells", () => {
     expect(currentSheet().columns).toHaveLength(3);
   });
 
+  it("a column whose heading was typed first becomes a number column with its first number", () => {
+    commitCell({ row: 0, col: 2 }, "Amount");
+    commitCell({ row: 1, col: 1 }, "A");
+    commitCell({ row: 1, col: 2 }, "10");
+    commitCell({ row: 2, col: 2 }, "5.5");
+    const [, amount] = currentSheet().columns;
+    expect(amount.type).toBe("number");
+    expect(summarize(useStore.getState().graph, amount, currentSheet().rows, "sum")).toBe("Sum 15.5");
+  });
+
+  it("sums numbers that are stored as text", () => {
+    writeCells({ row: 0, col: 1 }, [["Name", "Note"], ["A", "x"], ["B", "2"], ["C", "3"]]);
+    const [, note] = currentSheet().columns;
+    expect(note.type).toBe("text");
+    expect(summarize(useStore.getState().graph, note, currentSheet().rows, "sum")).toBe("Sum 5");
+  });
+
   it("summarizes columns for the footer", () => {
     writeCells({ row: 0, col: 1 }, [["Name", "Budget", "Due"], ["A", "10", "01/02/2027"], ["B", "32.5", "03/04/2026"], ["C", "", ""]]);
     const [, budget, due] = currentSheet().columns;
@@ -104,6 +121,57 @@ describe("writing cells", () => {
     expect(summarize(graph, budget, rows, "avg")).toBe("Average 21.25");
     expect(summarize(graph, budget, rows, "empty")).toBe("Empty 1");
     expect(summarize(graph, due, rows, "min")).toBe("Min 03/04/2026");
+  });
+});
+
+describe("formats", () => {
+  beforeEach(() => useStore.getState().open(emptyGraph(), newDbInfo()));
+  const text = (row: number, col: number) => cellText(useStore.getState().graph, currentSheet(), { row, col });
+
+  it("a DD.MM.YYYY column reads, shows and copies German dates, whatever the browser locale", () => {
+    writeCells({ row: 0, col: 1 }, [["Name", "Due"], ["A", "2026-11-25"]]);
+    useStore.getState().select({ row: 1, col: 2 });
+    formatColumns("date", "DD.MM.YYYY");
+    expect(text(1, 2)).toBe("25.11.2026");
+    writeCells({ row: 2, col: 1 }, [["B", "3.4.2027"]]);
+    expect(currentSheet().rows[1].props[currentSheet().columns[1].key]).toBe("2027-04-03");
+    // The locale's own notation is still understood.
+    writeCells({ row: 3, col: 1 }, [["C", "12/24/2026"]]);
+    expect(text(3, 2)).toBe("24.12.2026");
+    formatColumns("date", "D MMM YYYY");
+    expect(displayValue(useStore.getState().graph, currentSheet().columns[1], "2026-11-25")).toBe("Nov 25, 2026");
+  });
+
+  it("dates with dots are day.month.year in any locale, and give the new column that format", () => {
+    commitCell({ row: 0, col: 2 }, "Date");
+    commitCell({ row: 1, col: 2 }, "01.11.2026");
+    const [, date] = currentSheet().columns;
+    expect([date.type, date.format]).toEqual(["date", "DD.MM.YYYY"]);
+    expect(currentSheet().rows[0].props[date.key]).toBe("2026-11-01");
+    expect(text(1, 2)).toBe("01.11.2026");
+  });
+
+  it("turning a text column into a dated column converts its values", () => {
+    writeCells({ row: 0, col: 1 }, [["Name", "Due"], ["A", "soon"]]);
+    writeCells({ row: 1, col: 2 }, [["25.11.2026"]]);
+    expect(currentSheet().columns[1].type).toBe("text");
+    useStore.getState().select({ row: 1, col: 2 });
+    formatColumns("date", "DD.MM.YYYY");
+    expect(currentSheet().rows[0].props[currentSheet().columns[1].key]).toBe("2026-11-25");
+  });
+
+  it("number formats change only the display; percent is edited as %", () => {
+    writeCells({ row: 0, col: 1 }, [["Name", "Price", "Share"], ["A", "1234.5", "12.5%"]]);
+    const g = () => useStore.getState().graph;
+    useStore.getState().select({ row: 1, col: 2 });
+    formatColumns("number", "EUR");
+    expect(displayValue(g(), currentSheet().columns[1], 1234.5)).toBe("€1,234.50");
+    expect(text(1, 2)).toBe("1234.5");
+    useStore.getState().select({ row: 1, col: 3 });
+    formatColumns("number", "percent");
+    expect(currentSheet().rows[0].props[currentSheet().columns[2].key]).toBe(0.125);
+    expect(text(1, 3)).toBe("12.5%");
+    expect(displayValue(g(), currentSheet().columns[2], 0.125)).toBe("12.5%");
   });
 });
 

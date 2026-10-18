@@ -1,5 +1,5 @@
 import { displayValue } from "./graph";
-import { displayNumber } from "./locale";
+import { displayNumber, parseNumber } from "./locale";
 import type { Column, Graph, GraphNode, Summary } from "./types";
 
 export const SUMMARIES: [Summary, string][] = [
@@ -17,7 +17,8 @@ export function summarize(g: Graph, col: Column, rows: GraphNode[], kind: Summar
   const values = rows.map((r) => r.props[col.key]).filter((v) => v !== undefined && v !== "");
   if (kind === "count") return `${label} ${values.length}`;
   if (kind === "empty") return `${label} ${rows.length - values.length}`;
-  const nums = values.filter((v): v is number => typeof v === "number");
+  // Numbers typed into a text column still count.
+  const nums = values.map((v) => (typeof v === "number" ? v : typeof v === "string" ? parseNumber(v) : undefined)).filter((v): v is number => v !== undefined);
   if ((kind === "min" || kind === "max") && col.type === "date") {
     const dates = values.filter((v): v is string => typeof v === "string").sort();
     const d = kind === "min" ? dates[0] : dates.at(-1);
@@ -26,5 +27,5 @@ export function summarize(g: Graph, col: Column, rows: GraphNode[], kind: Summar
   if (!nums.length) return label;
   const sum = nums.reduce((a, b) => a + b, 0);
   const value = { sum, avg: sum / nums.length, min: Math.min(...nums), max: Math.max(...nums) }[kind];
-  return `${label} ${displayNumber(Math.round(value * 100) / 100)}`;
+  return `${label} ${displayNumber(Math.round(value * 10000) / 10000, col.format)}`;
 }

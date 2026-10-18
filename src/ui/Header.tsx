@@ -4,12 +4,48 @@ import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
 import { openDatabase } from "../model/persist";
 import { Settings } from "./Settings";
+import { About } from "./About";
+import { DATE_FORMATS, NUMBER_FORMATS, displayDate, displayNumber } from "../model/locale";
+import type { Column } from "../model/types";
+
+const SAMPLE_DATE = "2026-11-25";
+
+/** Format menu for the selected column(s); checks reflect the first selected column. */
+function formatItems(): MenuItem[] {
+  const cols = A.selectedColumns();
+  const c = cols[0];
+  const off = !c || useStore.getState().view !== "sheet";
+  const check = (on: boolean, label: string) => `${on ? "✓ " : "\u2003"}${label}`;
+  // format "" is the automatic (locale) notation.
+  const item = (type: Column["type"], format: string, label: string, example?: string): MenuItem => ({
+    label: check(c?.type === type && (c.format ?? "") === format, label),
+    shortcut: example,
+    disabled: off,
+    action: () => A.formatColumns(type, format),
+  });
+  return [
+    { heading: off ? "Select a column to format" : cols.length > 1 ? `${cols.length} columns` : `Column "${c.label}"` },
+    item("text", "", "Text"),
+    item("boolean", "", "Yes / No"),
+    "-",
+    { heading: "Number" },
+    item("number", "", "Automatic", displayNumber(1234.5)),
+    ...NUMBER_FORMATS.map(([f, label]) => item("number", f, label, displayNumber(f === "percent" ? 0.125 : 1234.5, f))),
+    "-",
+    { heading: "Date" },
+    item("date", "", "Automatic", displayDate(SAMPLE_DATE)),
+    ...DATE_FORMATS.map((f) => item("date", f, f, displayDate(SAMPLE_DATE, f))),
+    "-",
+    { label: check(!!c?.wrap, "Wrap text"), disabled: off, action: () => A.wrapColumns(!c.wrap) },
+  ];
+}
 
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
 
 export function Header() {
   const [open, setOpen] = useState<number | null>(null);
   const [settings, setSettings] = useState(false);
+  const [about, setAbout] = useState(false);
   const s = useStore();
   const { sel } = s;
   const m = A.currentSheet();
@@ -62,6 +98,10 @@ export function Header() {
       ],
     },
     {
+      label: "Format",
+      items: formatItems(),
+    },
+    {
       label: "View",
       items: [
         { label: "Table", action: () => s.setView("sheet") },
@@ -70,6 +110,15 @@ export function Header() {
         { label: hiddenCount ? `Show ${hiddenCount} hidden column${hiddenCount > 1 ? "s" : ""}` : "No hidden columns", disabled: !hiddenCount, action: () => A.unhideColumns() },
         "-",
         { label: "Settings…", action: () => setSettings(true) },
+      ],
+    },
+    {
+      label: "Help",
+      items: [
+        { label: "About GridGraph", action: () => setAbout(true) },
+        { label: "Where is my data stored?", action: () => setAbout(true) },
+        "-",
+        { label: "Documentation on GitHub", action: () => window.open("https://github.com/zehrer/GridGraph#readme", "_blank", "noopener") },
       ],
     },
   ];
@@ -114,6 +163,7 @@ export function Header() {
       </div>
       <div className="save-status">{s.saveError ? "⚠︎ Not saved" : s.savedAt ? `Saved ${s.savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</div>
       {settings && <Settings onClose={() => setSettings(false)} />}
+      {about && <About onClose={() => setAbout(false)} />}
     </header>
   );
 }

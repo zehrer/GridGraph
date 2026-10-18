@@ -14,6 +14,8 @@ export interface Column {
   hidden?: boolean;
   wrap?: boolean;
   summary?: Summary;
+  /** Date format (e.g. "DD.MM.YYYY") or number format (e.g. "EUR"); see locale.ts. */
+  format?: string;
 }
 
 /**

@@ -1,5 +1,5 @@
-import { addInstance, addType, columnsOf, deleteNode, renumber, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
-import { parseNumber } from "../model/locale";
+import { addInstance, addType, columnsOf, convertColumn, deleteNode, renumber, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
+import { guessDateFormat, parseNumber } from "../model/locale";
 import { download, importText, toGraphML, toJSON } from "../model/io";
 import { sampleGraph } from "../model/sample";
 import { deleteDatabase, openNew } from "../model/persist";
@@ -60,7 +60,7 @@ export const readOnly = ({ col }: Cell) => col === 0;
 /**
  * Writes a block of text into the sheet starting at `start`, as one undoable step.
  * Header cells (row 0) name columns; values in empty columns or rows create new
- * properties or instances. New columns get a type guessed from their values. When a
+ * properties or instances. New (or still empty) columns get a type guessed from their values. When a
  * table lands on an empty sheet, its first line is taken as the header.
  * Returns where the block was actually written and how many columns it covered.
  */
@@ -88,7 +88,15 @@ export function writeCells(start: Cell, matrix: Matrix): { start: Cell; width: n
       const values = matrix.filter((_, i) => i !== header).map((l) => l[j] ?? "");
       let col = m.columns[c - 1];
       if (!col && !label && !values.some((v) => v.trim())) continue;
-      col = col ? { ...col, label: label || col.label } : { key: newId("c"), label: label || `Column ${m.all.length + ++added}`, type: guessType(values) };
+      // An empty, unformatted text column (e.g. one whose heading was typed first) takes the type of its first values.
+      const blank = col?.type === "text" && !col.format && col.key !== m.type.nameKey && !instancesOf(g, m.type.id).some((n) => n.props[col!.key] !== undefined);
+      const guessed = (): Partial<Column> => {
+        const type = guessType(values);
+        return { type, ...(type === "date" && { format: guessDateFormat(values) }) };
+      };
+      col = col
+        ? { ...col, label: label || col.label, ...(blank && guessed()) }
+        : { key: newId("c"), label: label || `Column ${m.all.length + ++added}`, type: "text", ...guessed() };
       upsertColumn(g, m.type.id, col);
       cols.set(c, col);
     }
@@ -200,14 +208,36 @@ const editColumn = (col: number, patch: Partial<Column>) => {
 export function setColumnType(col: number, type: Column["type"], targetTypeId?: string) {
   const m = currentSheet();
   const c = m.columns[col - 1];
-  if (!c) return;
+  if (c) useStore.getState().edit((g) => convertColumn(g, m.type.id, c, type, targetTypeId));
+}
+
+/** Columns covered by the selection (the ID column excluded). */
+export function selectedColumns(): Column[] {
+  const { anchor, sel } = useStore.getState();
+  const { c0, c1 } = rangeOf(anchor, sel);
+  return currentSheet().columns.slice(Math.max(c0, 1) - 1, c1);
+}
+
+/**
+ * Format menu: sets the data type and/or display format of all selected columns in one step.
+ * A date or number format turns the column into a date or number column first.
+ */
+export function formatColumns(type: Column["type"], format = "") {
+  const cols = selectedColumns();
+  const typeId = useStore.getState().activeTypeId;
+  if (!cols.length) return;
   useStore.getState().edit((g) => {
-    // Relation cells store node ids; convert existing values by name (and back).
-    for (const n of instancesOf(g, m.type.id)) {
-      setProp(g, n.id, c.key, parseValue(g, { ...c, type, targetTypeId }, rawValue(g, c, n.props[c.key])));
+    for (const c of cols) {
+      if (c.type !== type) convertColumn(g, typeId, c, type, undefined, format || undefined);
+      patchColumn(g, typeId, c.key, { format: format || undefined });
     }
-    upsertColumn(g, m.type.id, { ...c, type, targetTypeId });
   });
+}
+
+export function wrapColumns(wrap: boolean) {
+  const cols = selectedColumns();
+  const typeId = useStore.getState().activeTypeId;
+  if (cols.length) useStore.getState().edit((g) => cols.forEach((c) => patchColumn(g, typeId, c.key, { wrap })));
 }
 
 export const setColumnWidth = (key: string, width: number) =>

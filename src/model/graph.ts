@@ -1,5 +1,5 @@
 import type { Column, ColumnType, DerivedEdge, Graph, GraphNode, Value } from "./types";
-import { displayNumber, formatBoolean, formatDate, formatNumber, isBoolean, parseBoolean, parseDate, parseNumber } from "./locale";
+import { displayDate, displayNumber, formatBoolean, formatDate, formatNumber, formatPercent, isBoolean, parseBoolean, parseDate, parseNumber } from "./locale";
 
 export const PALETTE = ["#1a73e8", "#188038", "#e37400", "#9334e6", "#d01884", "#12b5cb", "#d93025", "#5f6368"];
 
@@ -197,7 +197,7 @@ export function parseValue(g: Graph, col: Column, raw: string): Value | undefine
     case "boolean":
       return parseBoolean(s);
     case "date":
-      return parseDate(s) ?? s;
+      return parseDate(s, col.format) ?? s;
     case "relation": {
       if (!col.targetTypeId || !g.nodes[col.targetTypeId]) return s;
       const hit = instancesOf(g, col.targetTypeId).find((n) => nodeName(g, n).toLowerCase() === s.toLowerCase());
@@ -226,14 +226,25 @@ export function rawValue(g: Graph, col: Column, v: Value | undefined): string {
   if (v === undefined) return "";
   if (col.type === "relation" && typeof v === "string") return g.nodes[v] ? nodeName(g, g.nodes[v]) : v;
   if (col.type === "boolean") return formatBoolean(!!v);
-  if (col.type === "number" && typeof v === "number") return formatNumber(v);
-  if (col.type === "date" && typeof v === "string") return formatDate(v);
+  if (col.type === "number" && typeof v === "number") return col.format === "percent" ? formatPercent(v) : formatNumber(v);
+  if (col.type === "date" && typeof v === "string") return formatDate(v, col.format);
   return String(v);
 }
 
 export function displayValue(g: Graph, col: Column, v: Value | undefined): string {
-  if (col.type === "number" && typeof v === "number") return displayNumber(v);
+  if (col.type === "number" && typeof v === "number") return displayNumber(v, col.format);
+  if (col.type === "date" && typeof v === "string") return displayDate(v, col.format);
   return rawValue(g, col, v);
+}
+
+/**
+ * Changes a column's data type, converting existing values (links by name, and back).
+ * `format` is the new column's format; values are read with it, so "25.11.2026" becomes a date in a DD.MM.YYYY column.
+ */
+export function convertColumn(g: Graph, typeId: string, col: Column, type: ColumnType, targetTypeId?: string, format?: string) {
+  const next: Column = { ...col, type, targetTypeId: type === "relation" ? targetTypeId : undefined, format: col.type === type ? col.format : format };
+  for (const n of instancesOf(g, typeId)) setProp(g, n.id, col.key, parseValue(g, next, rawValue(g, col, n.props[col.key])));
+  upsertColumn(g, typeId, next);
 }
 
 export const nodeColor = (g: Graph, n: GraphNode) => n.color ?? (n.typeId && g.nodes[n.typeId]?.color) ?? "#5f6368";

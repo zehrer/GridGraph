@@ -2,7 +2,7 @@
 
 **GridGraph** is a local, schemaless graph database with a spreadsheet-style table and an interactive graph view.
 
-It runs entirely in the browser, with no server. Databases are saved automatically in the browser (IndexedDB).
+It runs entirely in the browser, with no server. Databases are saved automatically in the browser (IndexedDB) and never leave your device unless you export them.
 
 Live: https://zehrer.github.io/GridGraph/
 
@@ -26,6 +26,7 @@ Live: https://zehrer.github.io/GridGraph/
 | Columns | ▾ on a header: sort, move, wrap, hide, delete; drag a header to move it, drag its border to resize |
 | Rows | ＋ Row / − Row in the toolbar or right click; click an ID to select the row; Edit → Renumber IDs closes gaps |
 | Footer | Click below a column to show Sum, Average, Min, Max, Count or Empty |
+| Format | Format menu: data type, number format (€, $, %, decimals) and date format (e.g. DD.MM.YYYY) of the selected columns |
 | Settings | View → Settings: how many rows and columns the sheet shows at least |
 | Undo / redo | ⌘Z / ⇧⌘Z |
 | Graph | Drag = move node or view, wheel = zoom, double-click = open in table |
