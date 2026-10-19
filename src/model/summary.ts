@@ -1,5 +1,5 @@
 import { displayValue } from "./graph";
-import { cellValue } from "./formula";
+import { cellValue, numberFormat } from "./formula";
 import { displayNumber, parseNumber } from "./locale";
 import type { Column, Graph, GraphNode, Summary, Value } from "./types";
 
@@ -29,7 +29,7 @@ export function summarize(g: Graph, col: Column, rows: GraphNode[], kind: Summar
   if (!nums.length) return label;
   const sum = nums.reduce((a, b) => a + b, 0);
   const value = { sum, avg: sum / nums.length, min: Math.min(...nums), max: Math.max(...nums) }[kind];
-  return `${label} ${displayNumber(Math.round(value * 10000) / 10000, col.format)}`;
+  return `${label} ${displayNumber(Math.round(value * 10000) / 10000, numberFormat(g, rows[0]?.typeId, col))}`;
 }
 
 export type SelectionStat = "sum" | "avg" | "min" | "max" | "count" | "countNumbers";

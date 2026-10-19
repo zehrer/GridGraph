@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computeFormula, renameReference } from "./formula";
+import { computeFormula, formulaFormat, renameReference, shownColumn } from "./formula";
 import { setLocale } from "./locale";
 import { sampleGraph } from "./sample";
 
@@ -71,5 +71,26 @@ describe("formulas", () => {
 
   it("renames column references", () => {
     expect(renameReference("AGE([Geburtstag]) + [geburtstag ]", "Geburtstag", "Birthday")).toBe("AGE([Birthday]) + [Birthday]");
+  });
+
+  it("formula results inherit the number format of the columns they calculate with", () => {
+    const h = sampleGraph();
+    h.nodes.type_company.columns!.push({ key: "rev", label: "Revenue", type: "number", format: "EUR" }, { key: "usd", label: "Revenue $", type: "number", format: "USD" });
+    const fmt = (typeId: string, formula: string) => formulaFormat(h, typeId, { key: `f${formula}`, label: "F", type: "formula", formula });
+    expect(fmt("type_project", "[Budget (€)] / COUNT([Lead])")).toBe("EUR");
+    expect(fmt("type_project", "ROUND([Budget (€)] * 1.19; 2)")).toBe("EUR");
+    expect(fmt("type_project", "[Budget (€)] + 500")).toBe("EUR");
+    expect(fmt("type_project", 'IF([Days left] < 0; 0; [Budget (€)])')).toBe("EUR");
+    expect(fmt("type_project", "SUM([Client].[Revenue])")).toBe("EUR");
+    expect(fmt("type_project", "[Budget (€)] / [Budget (€)]")).toBeUndefined();
+    expect(fmt("type_project", "COUNT([Lead])")).toBeUndefined();
+    expect(fmt("type_company", "[Revenue] + [Revenue $]")).toBeUndefined();
+    expect(fmt("type_project", "[Deadline] - TODAY()")).toBeUndefined();
+    // An explicit format wins; formula columns pass their inferred format on.
+    expect(formulaFormat(h, "type_project", { key: "x", label: "X", type: "formula", formula: "[Budget (€)]", format: "percent" })).toBe("percent");
+    expect(fmt("type_project", "[Budget per lead] * 2")).toBe("EUR");
+    // The sample's "Budget per lead" shows in euros without a format of its own.
+    const perLead = h.nodes.type_project.columns!.find((c) => c.key === "perLead")!;
+    expect(shownColumn(h, h.nodes.proj_alpha, perLead).col.format).toBe("EUR");
   });
 });

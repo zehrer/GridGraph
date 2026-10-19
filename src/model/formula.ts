@@ -408,7 +408,93 @@ export function cellValue(g: Graph, node: GraphNode, col: Column): Value | undef
 export function shownColumn(g: Graph, node: GraphNode, col: Column): { col: Column; value?: Value; error?: string } {
   if (col.type !== "formula") return { col, value: node.props[col.key] };
   const r = computeFormula(g, node, col.formula ?? "");
-  return { col: { ...col, type: r.type }, value: r.value, error: r.error };
+  const format = col.format ?? (r.type === "number" && node.typeId ? formulaFormat(g, node.typeId, col) : undefined);
+  return { col: { ...col, type: r.type, format }, value: r.value, error: r.error };
+}
+
+// --- Number format of formula results ---
+
+/** The number format a column's values are shown in: its own, or for formulas the inferred one. */
+export const numberFormat = (g: Graph, typeId: string | undefined, col: Column): string | undefined =>
+  col.type === "formula" && typeId ? formulaFormat(g, typeId, col) : col.format;
+
+/** Functions whose result has the format of their (value) arguments. */
+const KEEPS_FORMAT = new Set(["SUM", "AVERAGE", "MIN", "MAX", "ROUND", "ABS"]);
+
+/**
+ * The number format a formula's result inherits from the columns it calculates with, like in
+ * spreadsheets: € + € = €, € * 1.19 = €, € / COUNT(…) = €, € / € = plain, COUNT(…) = plain.
+ * Different formats (€ + $) give none. An explicit column format always wins.
+ */
+export function formulaFormat(g: Graph, typeId: string, col: Column): string | undefined {
+  if (col.format) return col.format;
+  let byCol = formatCache.get(g);
+  if (!byCol) formatCache.set(g, (byCol = new Map()));
+  const key = `${typeId}:${col.key}`;
+  if (byCol.has(key)) return byCol.get(key) ?? undefined;
+  byCol.set(key, null); // guards against formulas that refer to each other
+  let format: string | undefined;
+  try {
+    format = astFormat(g, typeId, compile(col.formula ?? ""));
+  } catch {
+    format = undefined;
+  }
+  byCol.set(key, format ?? null);
+  return format;
+}
+const formatCache = new WeakMap<Graph, Map<string, string | null>>();
+
+/** Format of a column's numbers; formula columns contribute their inferred format. */
+function columnFormat(g: Graph, typeId: string, col: Column): string | undefined {
+  if (col.type === "number") return col.format;
+  if (col.type === "formula") return formulaFormat(g, typeId, col);
+  return undefined;
+}
+
+/** Type id an expression's links point to (for `.[Column]`), if it is a link. */
+function linkTarget(g: Graph, typeId: string, ast: Ast): string | undefined {
+  if (ast.k === "col") {
+    const c = columnByLabel(g, typeId, ast.name);
+    return c?.type === "relation" ? c.targetTypeId : undefined;
+  }
+  if (ast.k === "path") {
+    const base = linkTarget(g, typeId, ast.base);
+    return base ? linkTarget(g, base, { k: "col", name: ast.name }) : undefined;
+  }
+  return undefined;
+}
+
+function astFormat(g: Graph, typeId: string, ast: Ast): string | undefined {
+  const same = (a?: string, b?: string) => (a && b && a !== b ? undefined : (a ?? b));
+  switch (ast.k) {
+    case "lit":
+      return undefined;
+    case "col": {
+      const c = columnByLabel(g, typeId, ast.name);
+      return c ? columnFormat(g, typeId, c) : undefined;
+    }
+    case "path": {
+      const target = linkTarget(g, typeId, ast.base);
+      const c = target ? columnByLabel(g, target, ast.name) : undefined;
+      return target && c ? columnFormat(g, target, c) : undefined;
+    }
+    case "neg":
+      return astFormat(g, typeId, ast.a);
+    case "call": {
+      const args = ast.name === "IF" ? ast.args.slice(1, 3) : ast.name === "ROUND" ? ast.args.slice(0, 1) : ast.args;
+      if (!KEEPS_FORMAT.has(ast.name) && ast.name !== "IF") return undefined;
+      const formats = args.map((x) => astFormat(g, typeId, x));
+      return formats.reduce<string | undefined>((a, b) => same(a, b), undefined);
+    }
+    case "bin": {
+      const [a, b] = [astFormat(g, typeId, ast.a), astFormat(g, typeId, ast.b)];
+      if (ast.op === "+" || ast.op === "-") return same(a, b);
+      // € * 1.19 keeps €; € / 3 keeps €; € / € or € * € are plain.
+      if (ast.op === "*") return a && b ? undefined : (a ?? b);
+      if (ast.op === "/") return b ? undefined : a;
+      return undefined;
+    }
+  }
 }
 
 /** Rewrites references to a renamed column, e.g. [Geburtstag] → [Birthday]. */

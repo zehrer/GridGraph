@@ -230,7 +230,7 @@ describe("formula columns", () => {
     const col = () => currentSheet().columns.findIndex((c) => c.key === key) + 1;
     const text = (row: number) => cellText(useStore.getState().graph, currentSheet(), { row, col: col() });
     expect([text(1), text(2)]).toEqual(["150", "85"]);
-    expect(summarize(useStore.getState().graph, currentSheet().columns[col() - 1], currentSheet().rows, "sum")).toBe("Sum 235");
+    expect(summarize(useStore.getState().graph, currentSheet().columns[col() - 1], currentSheet().rows, "sum")).toBe("Sum €235.00");
     // Typing into a formula cell does nothing; renaming the referenced column updates the formula.
     writeCells({ row: 1, col: col() }, [["999"]]);
     expect(text(1)).toBe("150");

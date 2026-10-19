@@ -1,6 +1,6 @@
 import { addInstance, addType, columnsOf, convertColumn, deleteNode, renumber, typesOf, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
 import { guessDateFormat, parseNumber } from "../model/locale";
-import { cellValue, renameReference, shownColumn } from "../model/formula";
+import { cellValue, numberFormat, renameReference, shownColumn } from "../model/formula";
 import { download, fromJSON, importText, toGraphML, toJSON } from "../model/io";
 import { toHTML as toStandaloneHTML } from "../model/html-export";
 import { decodeText } from "../model/csv";
@@ -155,7 +155,7 @@ export function selectionValues(): { values: (Value | undefined)[]; cells: numbe
   const cols = m.columns.slice(Math.max(c0, 1) - 1, c1);
   const rows = m.rows.slice(Math.max(r0, 1) - 1, r1);
   const values = rows.flatMap((n) => cols.map((c) => cellValue(useStore.getState().graph, n, c)));
-  const formats = new Set(cols.map((c) => (c.type === "number" ? (c.format ?? "") : "")));
+  const formats = new Set(cols.map((c) => (c.type === "number" || c.type === "formula" ? (numberFormat(useStore.getState().graph, m.type.id, c) ?? "") : "")));
   return { values, cells: (r1 - r0 + 1) * (c1 - c0 + 1), format: formats.size === 1 ? [...formats][0] || undefined : undefined };
 }
 

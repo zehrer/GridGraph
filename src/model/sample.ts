@@ -33,7 +33,7 @@ export function sampleGraph(): Graph {
       { key: "client", label: "Client", type: "relation", targetTypeId: "type_company", width: 150 },
       { key: "lead", label: "Lead", type: "relation", targetTypeId: "type_person", width: 140 },
       { key: "clientStaff", label: "Client staff", type: "formula", formula: "SUM([Client].[Employees])" },
-      { key: "perLead", label: "Budget per lead", type: "formula", formula: "[Budget (€)] / COUNT([Lead])", format: "EUR", width: 130 },
+      { key: "perLead", label: "Budget per lead", type: "formula", formula: "[Budget (€)] / COUNT([Lead])", width: 130 },
       { key: "status", label: "Status", type: "formula", formula: 'IF([Days left] < 0; "overdue"; IF([Days left] < 90; "due soon"; "on track"))' },
     ], "Project name"),
     inst("comp_acme", "type_company", "Acme Technologies", { city: "Berlin", employees: 120, isHiring: true, industry: "Software & AI" }),

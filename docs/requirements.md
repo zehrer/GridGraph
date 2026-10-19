@@ -100,6 +100,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | FX-6 | Errors (unknown column, not a number, self-reference …) show `#ERROR` in the cell with the reason as a tooltip. | Done |
 | FX-7 | Formula editor (Insert → Formula column…, Format → Formula…, column menu, or the toolbar's type list): column shortcuts, live preview of the first rows, error message. | Done |
 | FX-8 | Results take part in display formats (number/date formats of the Format menu), sorting, filtering, the summary row and the status bar. "Convert to values" turns a formula column into a plain column with its current results. | Done |
+| FX-10 | **Formula results inherit the number format** of the columns they calculate with (when the formula column has no format of its own): € + € = €, € × 1.19 = €, € / COUNT(…) = €, SUM/AVERAGE/MIN/MAX/ROUND/ABS/IF keep it, also through links; € / €, € × €, mixed formats (€ + $), COUNT/YEAR/date differences give plain numbers. Used in cells, summary row, status bar and HTML export. | Done |
 | FX-9 | The parser is self-written (no `eval`), so imported files cannot run code. | Done |
 
 ## 4b. Help

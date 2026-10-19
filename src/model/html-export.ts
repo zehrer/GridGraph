@@ -4,7 +4,7 @@
  * opened in GridGraph again (button "Open in GridGraph", or File → Import).
  */
 import { columnsOf, displayValue, instancesOf, linkIds, nodeColor, nodeName, typesOf } from "./graph";
-import { shownColumn } from "./formula";
+import { numberFormat, shownColumn } from "./formula";
 import { summarize } from "./summary";
 import { isListUnit, quickKeys, quickValues } from "./filter";
 import { toJSON } from "./io";
@@ -54,7 +54,7 @@ function table(g: Graph, t: GraphNode, cols: Column[], rows: GraphNode[], anchor
   const body = rows.map((n) => `<tr${anchors ? ` id="${anchor(n.id)}"` : ""}${q(n)}><td class="id">${n.no ?? ""}</td>${cols.map((c) => cell(g, n, c.key, sums && !!c.summary)).join("")}</tr>`).join("\n");
   // Precomputed for all rows; the page recomputes it for the rows a quick filter leaves.
   const foot = sums
-    ? `<tfoot><tr><td class="id">${rows.length}</td>${cols.map((c) => `<td class="r"${c.summary ? ` data-sum="${c.summary}" data-fmt="${esc(c.format ?? "")}"` : ""}>${c.summary ? esc(summarize(g, c, rows, c.summary)) : ""}</td>`).join("")}</tr></tfoot>`
+    ? `<tfoot><tr><td class="id">${rows.length}</td>${cols.map((c) => `<td class="r"${c.summary ? ` data-sum="${c.summary}" data-fmt="${esc(numberFormat(g, t.id, c) ?? "")}"` : ""}>${c.summary ? esc(summarize(g, c, rows, c.summary)) : ""}</td>`).join("")}</tr></tfoot>`
     : "";
   return `<div class="scroll"><table>
 <thead>${head}</thead>
