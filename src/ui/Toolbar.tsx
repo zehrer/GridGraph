@@ -1,6 +1,6 @@
 import { useStore } from "../model/store";
 import { typesOf } from "../model/graph";
-import { addRow, currentSheet, deleteRows, goBack, setColumnType, sortBy } from "./actions";
+import { addRow, currentSheet, deleteRows, goBack, setColumnType, sortBy, toggleFilters } from "./actions";
 
 const TYPES = [
   ["text", "Text"],
@@ -13,6 +13,7 @@ export function Toolbar() {
   const s = useStore();
   const column = s.sel.col >= 1 ? currentSheet().columns[s.sel.col - 1] : undefined;
   const sheet = s.view === "sheet";
+  const filterOn = !!s.graph.nodes[s.activeTypeId]?.filterOn;
   const typeValue = column ? (column.type === "relation" ? `rel:${column.targetTypeId ?? ""}` : column.type) : "";
 
   return (
@@ -55,7 +56,15 @@ export function Toolbar() {
       <button title="Sort descending" disabled={!sheet} onClick={() => sortBy(s.sel.col, false)}>Z→A</button>
       {s.sort && <button title="Clear sorting" onClick={() => useStore.setState({ sort: null })}>✕</button>}
       <span className="sep" />
-      <input id="sheet-filter" className="search" placeholder="Filter rows" value={s.filter} disabled={!sheet} onChange={(e) => useStore.setState({ filter: e.target.value })} />
+      <button
+        className={filterOn ? "on" : ""}
+        title={filterOn ? "Remove filter (⇧⌘F)" : "Create a filter (⇧⌘F)"}
+        disabled={!sheet}
+        onClick={toggleFilters}
+      >
+        <svg className="funnel" viewBox="0 0 12 12" aria-hidden><path d="M1 2h10L7 6.5V10L5 11V6.5Z" /></svg>
+      </button>
+      <input id="sheet-filter" className="search" placeholder="Search rows" value={s.filter} disabled={!sheet} onChange={(e) => useStore.setState({ filter: e.target.value })} />
       <div className="spacer" />
       <div className="segmented">
         <button className={sheet ? "on" : ""} onClick={() => s.setView("sheet")}>Table</button>

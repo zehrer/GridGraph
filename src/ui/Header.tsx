@@ -56,7 +56,6 @@ export function Header() {
   const hiddenCount = m.all.filter((c) => c.hidden).length;
   const sheet = s.view === "sheet";
   const colSelected = sel.col === 0 || !!m.columns[sel.col - 1];
-  const cellValue = sel.row >= 1 ? A.cellText(s.graph, m, sel) : "";
 
   const menus: { label: string; items: MenuItem[] }[] = [
     {
@@ -128,9 +127,12 @@ export function Header() {
         { label: "Sort Z → A", disabled: !sheet || !colSelected, action: () => A.sortBy(sel.col, false) },
         { label: "Sort by ID", disabled: !sheet, action: () => useStore.setState({ sort: null }) },
         "-",
-        { label: "Filter…", shortcut: `${MOD}F`, disabled: !sheet, action: A.focusFilter },
-        { label: "Filter by selected value", disabled: !sheet || !cellValue, action: () => useStore.setState({ filter: cellValue }) },
-        { label: "Clear filter", disabled: !s.filter, action: () => useStore.setState({ filter: "" }) },
+        { label: m.type.filterOn ? "Remove filter" : "Create a filter", shortcut: `⇧${MOD}F`, disabled: !sheet, action: A.toggleFilters },
+        { label: "Filter by selected value", disabled: !sheet || sel.row < 1 || sel.col < 1 || !m.rows[sel.row - 1], action: A.filterBySelectedValue },
+        { label: "Clear all filters", disabled: !Object.keys(m.type.filters ?? {}).length, action: A.clearFilters },
+        "-",
+        { label: "Search rows…", shortcut: `${MOD}F`, disabled: !sheet, action: A.focusFilter },
+        { label: "Clear search", disabled: !s.filter, action: () => useStore.setState({ filter: "" }) },
         "-",
         { label: "Renumber IDs…", disabled: !m.rows.length, action: A.renumberIds },
       ],

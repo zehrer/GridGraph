@@ -7,6 +7,8 @@ import { shownColumn } from "../model/formula";
 import type { Column, Graph, GraphNode } from "../model/types";
 import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
+import { FilterPanel } from "./FilterPanel";
+import { isActive } from "../model/filter";
 
 const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗", formula: "ƒ" };
 const MOVES: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
@@ -25,6 +27,7 @@ export function Sheet() {
   const [extraRows, setExtraRows] = useState(0);
   const [addCount, setAddCount] = useState("1000");
   const [popup, setPopup] = useState<Popup | null>(null);
+  const [filterFor, setFilterFor] = useState<{ key: string; x: number; y: number } | null>(null);
   const [resize, setResize] = useState<{ key: string; width: number } | null>(null);
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -260,7 +263,8 @@ export function Sheet() {
     const hidden = hiddenBefore.get(col);
     const isName = !!c && c.key === m.type.nameKey;
     const drop = drag && c && drag.over === col && drag.from !== col ? (drag.from < col ? "drop-after" : "drop-before") : "";
-    const cls = [sel.row === 0 && sel.col === col && "sel", inRange(0, col) && "in-range", col === sel.col && "hl", isName && "name-col", c?.wrap && "wrap", drop];
+    const filtered = !!c && isActive(m.type.filters?.[c.key]);
+    const cls = [sel.row === 0 && sel.col === col && "sel", inRange(0, col) && "in-range", col === sel.col && "hl", isName && "name-col", c?.wrap && "wrap", m.type.filterOn && c && "has-filter", drop];
     return (
       <td
         key={col}
@@ -302,6 +306,19 @@ export function Sheet() {
         {c && (
           <>
             <button className="col-menu" title="Column menu" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => openAt(e.currentTarget, columnMenu(col))}>▾</button>
+            {m.type.filterOn && (
+              <button
+                className={`filter-btn${filtered ? " on" : ""}`}
+                title={filtered ? "Filtered – change filter" : "Filter this column"}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setFilterFor({ key: c.key, x: r.right - 280, y: r.bottom + 2 });
+                }}
+              >
+                <svg viewBox="0 0 12 12" aria-hidden><path d="M1 2h10L7 6.5V10L5 11V6.5Z" /></svg>
+              </button>
+            )}
             <span className="resizer" title="Drag to resize" onPointerDown={(e) => startResize(e, c)} onMouseDown={(e) => e.stopPropagation()} />
           </>
         )}
@@ -391,6 +408,7 @@ export function Sheet() {
         )}
       </div>
       {popup && <MenuList items={popup.items} at={popup} up={popup.up} onClose={() => setPopup(null)} />}
+      {filterFor && <FilterPanel key={filterFor.key} colKey={filterFor.key} at={filterFor} onClose={() => setFilterFor(null)} />}
     </div>
   );
 }

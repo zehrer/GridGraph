@@ -134,6 +134,7 @@ export function moveColumn(g: Graph, typeId: string, key: string, beforeKey?: st
 export function removeColumn(g: Graph, typeId: string, key: string) {
   const t = g.nodes[typeId];
   if (t) t.columns = declareColumns(g, typeId).filter((c) => c.key !== key);
+  if (t?.filters) delete t.filters[key];
   for (const inst of instancesOf(g, typeId)) delete inst.props[key];
 }
 

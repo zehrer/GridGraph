@@ -2,6 +2,16 @@
 export type ColumnType = "text" | "number" | "date" | "boolean" | "relation" | "formula";
 /** A link cell holds one node id, or several as an array. */
 export type Value = string | number | boolean | string[];
+/** Conditions of a column filter; `a`/`b` are the user's input (b only for "between"). */
+export type FilterOp = "empty" | "notEmpty" | "contains" | "notContains" | "startsWith" | "endsWith" | "equals" | "gt" | "gte" | "lt" | "lte" | "between";
+
+/** Excel-style column filter: rows pass when their value is in `values` (if set) and meets `condition` (if set). */
+export interface ColumnFilter {
+  /** Allowed values as canonical keys (see filter.ts); "" stands for blanks. */
+  values?: string[];
+  condition?: { op: FilterOp; a?: string; b?: string };
+}
+
 /** Aggregate shown in the sheet footer. */
 export type Summary = "sum" | "avg" | "min" | "max" | "count" | "empty";
 
@@ -40,6 +50,9 @@ export interface GraphNode {
   nameKey?: string;
   /** Running number the next instance gets; numbers are never reused. */
   nextNo?: number;
+  /** Whether the sheet shows filter buttons, and the active column filters by column key. */
+  filterOn?: boolean;
+  filters?: Record<string, ColumnFilter>;
   // Instances only:
   /** ID shown in the sheet: running number per type, assigned on creation. */
   no?: number;

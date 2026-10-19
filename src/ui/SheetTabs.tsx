@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../model/store";
 import { PALETTE, typesOf } from "../model/graph";
-import { deleteSheet, newSheet } from "./actions";
+import { currentSheet, deleteSheet, newSheet } from "./actions";
 import { MenuList } from "./Menu";
 import { SelectionStats } from "./SelectionStats";
 
@@ -68,7 +68,22 @@ export function SheetTabs() {
           </div>
         );
       })}
+      {view === "sheet" && <RowCount />}
       {view === "sheet" && <SelectionStats />}
     </footer>
+  );
+}
+
+/** "3 of 10 rows" while a search or column filter hides rows. */
+function RowCount() {
+  useStore((s) => s.graph);
+  useStore((s) => s.filter);
+  useStore((s) => s.activeTypeId);
+  const m = currentSheet();
+  if (m.rows.length === m.total) return null;
+  return (
+    <div className="row-count" title="Rows shown by the current search and filters">
+      {m.rows.length} of {m.total} rows
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useStore } from "../model/store";
-import { focusFilter, goBack, importFile } from "./actions";
+import { focusFilter, goBack, importFile, toggleFilters } from "./actions";
 import { GraphView } from "./GraphView";
 import { Header } from "./Header";
 import { Sheet } from "./Sheet";
@@ -25,6 +25,7 @@ export function App() {
       if (k === "z") e.shiftKey ? s.redo() : s.undo();
       else if (k === "y") s.redo();
       else if (k === "o") importFile();
+      else if (k === "f" && e.shiftKey) toggleFilters();
       else if (k === "f") focusFilter();
       else if (k === "[") goBack();
       else return;

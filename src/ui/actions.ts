@@ -8,7 +8,8 @@ import { sampleGraph } from "../model/sample";
 import { deleteDatabase, openNew } from "../model/persist";
 import { rangeOf, useStore, type Cell } from "../model/store";
 import { parseClipboard, toHTML, toTSV, type Matrix } from "../model/clipboard";
-import type { Column, Graph, GraphNode, Summary, Value } from "../model/types";
+import type { Column, ColumnFilter, Graph, GraphNode, Summary, Value } from "../model/types";
+import { applyFilters, cellKeys, isActive } from "../model/filter";
 
 export interface SheetModel {
   type: GraphNode;
@@ -16,7 +17,12 @@ export interface SheetModel {
   columns: Column[];
   /** All columns including hidden ones. */
   all: Column[];
+  /** Rows shown: searched, filtered and sorted. */
   rows: GraphNode[];
+  /** Rows matching the search box, before column filters. */
+  base: GraphNode[];
+  /** Number of rows of the type. */
+  total: number;
 }
 
 export interface SheetView {
@@ -30,8 +36,11 @@ export function sheetModel(g: Graph, typeId: string, { sort, filter }: SheetView
   const all = columnsOf(g, typeId);
   const columns = all.filter((c) => !c.hidden);
   const q = filter.trim().toLowerCase();
-  let rows = instancesOf(g, typeId);
-  if (q) rows = rows.filter((n) => [String(n.no), ...all.map((c) => textOf(g, n, c))].some((v) => v.toLowerCase().includes(q)));
+  const type = g.nodes[typeId];
+  const total = instancesOf(g, typeId);
+  // "base": rows after the search box, before column filters (the filter panel lists their values).
+  const base = q ? total.filter((n) => [String(n.no), ...all.map((c) => textOf(g, n, c))].some((v) => v.toLowerCase().includes(q))) : total;
+  let rows = applyFilters(g, type, all, base);
   const col = sort && all.find((c) => c.key === sort.key);
   const key = (n: GraphNode) => {
     if (!col) return n.no ?? "";
@@ -44,7 +53,7 @@ export function sheetModel(g: Graph, typeId: string, { sort, filter }: SheetView
     const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
     return asc ? c : -c;
   });
-  return { type: g.nodes[typeId], columns, all, rows };
+  return { type, columns, all, rows, base, total: total.length };
 }
 
 export const currentSheet = () => {
@@ -218,6 +227,42 @@ export function deleteRows() {
   if (!doomed.length) return;
   edit((g) => doomed.forEach((n) => deleteNode(g, n.id)));
   select({ row: Math.max(r0, 1), col: sel.col });
+}
+
+// --- Column filters (Excel-style) ---
+
+const editType = (fn: (t: GraphNode) => void) => {
+  const typeId = useStore.getState().activeTypeId;
+  useStore.getState().edit((g) => fn(g.nodes[typeId]));
+};
+
+/** Data → Create a filter / Remove filter. Removing also clears the filters, as in spreadsheets. */
+export function toggleFilters() {
+  editType((t) => {
+    t.filterOn = !t.filterOn;
+    if (!t.filterOn) delete t.filters;
+  });
+}
+
+export function setColumnFilter(key: string, f?: ColumnFilter) {
+  editType((t) => {
+    t.filterOn = true;
+    const filters = { ...t.filters };
+    if (isActive(f)) filters[key] = f!;
+    else delete filters[key];
+    t.filters = filters;
+  });
+}
+
+export const clearFilters = () => editType((t) => void delete t.filters);
+
+/** Data → Filter by selected value: shows only rows with the active cell's value in its column. */
+export function filterBySelectedValue() {
+  const { sel, graph } = useStore.getState();
+  const m = currentSheet();
+  const col = m.columns[sel.col - 1];
+  const node = m.rows[sel.row - 1];
+  if (col && node) setColumnFilter(col.key, { values: cellKeys(graph, node, col) });
 }
 
 /** Data → Filter…: puts the cursor into the toolbar's search field. */
