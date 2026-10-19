@@ -6,7 +6,10 @@ const type = (id: string, label: string, color: string, columns: Column[], nameL
 });
 const inst = (id: string, typeId: string, name: string, props: Record<string, Value>): GraphNode => ({ id, typeId, props: { name, ...props } });
 
-/** Demo data: three types, cross-type relations and a few schemaless extra properties. IDs are assigned by `normalize`. */
+/**
+ * Demo data: three types, cross-type links, a few schemaless extra properties and formula columns
+ * (row formulas, date arithmetic, formulas that follow links). IDs are assigned by `normalize`.
+ */
 export function sampleGraph(): Graph {
   const nodes = [
     type("type_person", "Person", "#1a73e8", [
@@ -15,18 +18,23 @@ export function sampleGraph(): Graph {
       { key: "currentAge", label: "Current age", type: "formula", formula: "AGE([Birthday])" },
       { key: "isRemote", label: "Remote", type: "boolean" },
       { key: "company", label: "Employer", type: "relation", targetTypeId: "type_company", width: 150 },
+      { key: "employerCity", label: "Employer city", type: "formula", formula: "[Employer].[City]" },
     ]),
     type("type_company", "Company", "#188038", [
       { key: "city", label: "City", type: "text" },
       { key: "employees", label: "Employees", type: "number", summary: "sum" },
       { key: "isHiring", label: "Hiring", type: "boolean" },
+      { key: "label", label: "Label", type: "formula", formula: '[Name] & " (" & [City] & ")"', width: 200 },
     ]),
     type("type_project", "Project", "#e37400", [
-      { key: "budget", label: "Budget (€)", type: "number", summary: "sum" },
+      { key: "budget", label: "Budget (€)", type: "number", summary: "sum", format: "EUR" },
       { key: "deadline", label: "Deadline", type: "date" },
       { key: "daysLeft", label: "Days left", type: "formula", formula: "[Deadline] - TODAY()" },
       { key: "client", label: "Client", type: "relation", targetTypeId: "type_company", width: 150 },
       { key: "lead", label: "Lead", type: "relation", targetTypeId: "type_person", width: 140 },
+      { key: "clientStaff", label: "Client staff", type: "formula", formula: "SUM([Client].[Employees])" },
+      { key: "perLead", label: "Budget per lead", type: "formula", formula: "[Budget (€)] / COUNT([Lead])", format: "EUR", width: 130 },
+      { key: "status", label: "Status", type: "formula", formula: 'IF([Days left] < 0; "overdue"; IF([Days left] < 90; "due soon"; "on track"))' },
     ], "Project name"),
     inst("comp_acme", "type_company", "Acme Technologies", { city: "Berlin", employees: 120, isHiring: true, industry: "Software & AI" }),
     inst("comp_nova", "type_company", "Nova Dynamics", { city: "Munich", employees: 45, isHiring: false }),

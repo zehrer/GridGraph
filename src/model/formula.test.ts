@@ -60,6 +60,15 @@ describe("formulas", () => {
     expect(computeFormula(h, h.nodes.person_alice, "[X]").error).toBe("[X] refers to itself");
   });
 
+  it("the sample's formula columns compute", () => {
+    const col = (typeId: string, key: string) => g.nodes[typeId].columns!.find((c) => c.key === key)!;
+    const v = (id: string, typeId: string, key: string) => computeFormula(g, g.nodes[id], col(typeId, key).formula!).value;
+    expect(v("person_bob", "type_person", "employerCity")).toBe("Berlin");
+    expect(v("comp_nova", "type_company", "label")).toBe("Nova Dynamics (Munich)");
+    expect([v("proj_alpha", "type_project", "clientStaff"), v("proj_beta", "type_project", "perLead")]).toEqual([120, 85000]);
+    expect([v("proj_alpha", "type_project", "status"), v("proj_beta", "type_project", "status")]).toEqual(["due soon", "on track"]);
+  });
+
   it("renames column references", () => {
     expect(renameReference("AGE([Geburtstag]) + [geburtstag ]", "Geburtstag", "Birthday")).toBe("AGE([Birthday]) + [Birthday]");
   });
