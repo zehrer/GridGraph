@@ -47,7 +47,7 @@ SUM([Client].[Employees])
 
 Columns are referenced by name; `.[Column]` follows a link. Functions: IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT.
 
-**File menu**: new database, saved databases in this browser, import/export as JSON or GraphML (Gephi, yEd, Cytoscape), sample data.
+**File menu**: new database, saved databases in this browser, import/export as JSON or GraphML (Gephi, yEd, Cytoscape), sample data, and **Export as HTML** – a single file anyone can view in a browser, with an “Open in GridGraph” button to edit the data again.
 
 See [docs/requirements.md](docs/requirements.md) for requirements and decisions.
 

@@ -141,6 +141,8 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | DB-9 | Import JSON (current and v1 format) and GraphML (also foreign files with generated key ids). An import opens as a new database named after the file. | Done |
 | DB-10 | "Open sample data" opens a demo database (Person, Company, Project). | Done |
 | DB-11 | Data saved by version 0.2 (single database) is migrated on first start. | Done |
+| DB-13 | **Export as HTML**: one self-contained file that shows every sheet as a table in any browser without GridGraph or internet – IDs, column order, display formats, formula results, summary rows; link cells are anchors to the linked row. Printable. | Done |
+| DB-14 | The HTML export has a box with a link to GridGraph and an **Open in GridGraph** button: it opens the app in a new tab and hands over the embedded database by `postMessage` (not via a server or the URL); the app asks before opening it as a new database. Fallback: File → Import accepts the HTML file, which embeds the full database as JSON. | Done |
 | DB-12 | Save to / open from a local file (File System Access API) in addition to browser storage. | Idea |
 
 ## 8. Non-functional

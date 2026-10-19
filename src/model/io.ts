@@ -104,7 +104,15 @@ export function fromGraphML(text: string): Graph {
   return fromParts(nodes, edges);
 }
 
+/** The database embedded in an HTML export (see html-export.ts), if any. */
+export const embeddedJSON = (html: string) => html.match(/<script type="application\/json" id="gridgraph-data">([\s\S]*?)<\/script>/)?.[1];
+
 export function importText(fileName: string, text: string): Graph {
+  if (/\.html?$/i.test(fileName) || /^\s*<!doctype html/i.test(text)) {
+    const json = embeddedJSON(text);
+    if (!json) throw new Error("This HTML file was not exported from GridGraph.");
+    return fromJSON(json);
+  }
   return /\.(xml|graphml)$/i.test(fileName) || text.trimStart().startsWith("<") ? fromGraphML(text) : fromJSON(text);
 }
 

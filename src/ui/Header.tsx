@@ -63,11 +63,12 @@ export function Header() {
       label: "File",
       items: [
         { label: "New database", action: A.newDatabase },
-        { label: "Import (JSON, GraphML)…", shortcut: `${MOD}O`, action: A.importFile },
+        { label: "Import (JSON, GraphML, HTML)…", shortcut: `${MOD}O`, action: A.importFile },
         { label: "Open sample data", action: A.loadSample },
         "-",
         { label: "Export as JSON", action: A.exportJSON },
         { label: "Export as GraphML", action: A.exportGraphML },
+        { label: "Export as HTML (view in any browser)", action: A.exportHTML },
         "-",
         ...(s.dbs.length ? [{ heading: "Saved in this browser" }] : []),
         ...s.dbs.map((d) => ({

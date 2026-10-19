@@ -1,5 +1,6 @@
 import { del, get, set } from "idb-keyval";
 import { emptyGraph } from "./graph";
+import { fromJSON } from "./io";
 import { newDbInfo, useStore, type DbInfo } from "./store";
 import type { Graph } from "./types";
 
@@ -31,6 +32,29 @@ export async function initPersistence() {
     useStore.setState({ saveError: String(e) });
   }
   useStore.subscribe((s, prev) => s.revision !== prev.revision && schedule());
+  receiveFromExport();
+}
+
+/**
+ * "Open in GridGraph" in an HTML export opens this app with #import and sends the embedded
+ * database by postMessage once we report ready. The user confirms before anything is saved.
+ */
+export function receiveFromExport() {
+  if (location.hash !== "#import" || !window.opener) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  let done = false;
+  window.addEventListener("message", async (e: MessageEvent) => {
+    if (done || e.source !== window.opener || e.data?.type !== "gridgraph-data" || typeof e.data.json !== "string") return;
+    done = true;
+    const name = String(e.data.name || "Imported");
+    if (!confirm(`Open "${name}" from the exported file as a new database in this browser?`)) return;
+    try {
+      await openNew(fromJSON(e.data.json), name);
+    } catch (err) {
+      alert(`Import failed: ${(err as Error).message}`);
+    }
+  });
+  window.opener.postMessage({ type: "gridgraph-ready" }, "*");
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;

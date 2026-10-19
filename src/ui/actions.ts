@@ -2,6 +2,7 @@ import { addInstance, addType, columnsOf, convertColumn, deleteNode, renumber, t
 import { guessDateFormat, parseNumber } from "../model/locale";
 import { cellValue, renameReference, shownColumn } from "../model/formula";
 import { download, importText, toGraphML, toJSON } from "../model/io";
+import { toHTML as toStandaloneHTML } from "../model/html-export";
 import { sampleGraph } from "../model/sample";
 import { deleteDatabase, openNew } from "../model/persist";
 import { rangeOf, useStore, type Cell } from "../model/store";
@@ -405,12 +406,18 @@ export const nameOf = (id: string) => {
 const fileName = (ext: string) => `${useStore.getState().db.name.replace(/[\\/:*?"<>|]/g, "_")} ${new Date().toISOString().slice(0, 10)}.${ext}`;
 export const exportJSON = () => download(toJSON(useStore.getState().graph), fileName("json"), "application/json");
 export const exportGraphML = () => download(toGraphML(useStore.getState().graph), fileName("graphml"), "application/xml");
+/** The app's own address, which the HTML export links back to. */
+const appUrl = () => new URL(import.meta.env.BASE_URL, location.href).href;
+export const exportHTML = () => {
+  const { graph, db } = useStore.getState();
+  download(toStandaloneHTML(graph, db.name, appUrl()), fileName("html"), "text/html");
+};
 
 /** Imports a file as a new database named after the file. */
 export function importFile() {
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".json,.xml,.graphml";
+  input.accept = ".json,.xml,.graphml,.html,.htm";
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
