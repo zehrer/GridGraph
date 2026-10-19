@@ -10,6 +10,7 @@ import { toHTML } from "../model/html-export";
 import { applyViewById, toggleQuickFilter, quickChoices, setQuickValue, clearQuickFilter, currentSheet, saveViewAs, startQuickFilter, stepQuickFilter, toggleQuickUnit } from "./actions";
 
 const names = () => currentSheet().rows.map((n) => nodeName(useStore.getState().graph, n));
+const qk = () => currentSheet().type.quickFilters![0].key;
 const col = (label: string) => currentSheet().columns.findIndex((c) => c.label === label) + 1;
 
 describe("quick filter", () => {
@@ -27,15 +28,15 @@ describe("quick filter", () => {
     useStore.getState().open(sampleGraph(), newDbInfo());
     useStore.getState().setActiveType("type_project");
     startQuickFilter(col("Deadline"), "year");
-    expect(currentSheet().type.quickFilter).toEqual({ key: "deadline", unit: "year", value: "2027" });
+    expect(currentSheet().type.quickFilters?.[0]).toEqual({ key: "deadline", unit: "year", value: "2027" });
     expect(names()).toEqual(["Cloud Portal"]);
-    stepQuickFilter(-1);
+    stepQuickFilter(qk(), -1);
     expect(names()).toEqual(["Graph Engine V2"]);
-    toggleQuickUnit();
-    expect(currentSheet().type.quickFilter?.value).toBe("2026-12");
-    stepQuickFilter(1);
+    toggleQuickUnit(qk());
+    expect(currentSheet().type.quickFilters?.[0]?.value).toBe("2026-12");
+    stepQuickFilter(qk(), 1);
     expect(names()).toEqual([]);
-    clearQuickFilter();
+    clearQuickFilter(qk());
     expect(names()).toHaveLength(2);
   });
 
@@ -45,7 +46,7 @@ describe("quick filter", () => {
     const row = currentSheet().rows.findIndex((n) => n.id === "buch_001") + 1;
     useStore.getState().select({ row, col: year });
     startQuickFilter(year, "number");
-    expect(currentSheet().type.quickFilter?.value).toBe("1942");
+    expect(currentSheet().type.quickFilters?.[0]?.value).toBe("1942");
     expect(names()).toContain("The Stranger");
     expect(currentSheet().rows.every((n) => n.props.jahr === 1942)).toBe(true);
     // The graph leaves out the other books too.
@@ -60,9 +61,9 @@ describe("quick filter", () => {
     saveViewAs();
     const id = currentSheet().type.activeView!;
     applyViewById(null);
-    expect(currentSheet().type.quickFilter).toBeUndefined();
+    expect(currentSheet().type.quickFilters?.[0]).toBeUndefined();
     applyViewById(id);
-    expect(currentSheet().type.quickFilter).toEqual({ key: "birthday", unit: "year", value: "1998" });
+    expect(currentSheet().type.quickFilters?.[0]).toEqual({ key: "birthday", unit: "year", value: "1998" });
     expect(names()).toEqual(["Bob Meier"]);
   });
 
@@ -72,23 +73,23 @@ describe("quick filter", () => {
     const row = currentSheet().rows.findIndex((n) => n.id === "buch_001") + 1;
     useStore.getState().select({ row, col: publisher });
     startQuickFilter(publisher, "link");
-    expect(currentSheet().type.quickFilter).toEqual({ key: "verlag", unit: "link", value: "verlag_gallimard" });
+    expect(currentSheet().type.quickFilters?.[0]).toEqual({ key: "verlag", unit: "link", value: "verlag_gallimard" });
     // Proust (Grasset and Gallimard) counts for Gallimard too.
     expect(names()).toContain("In Search of Lost Time");
-    const choices = quickChoices();
+    const choices = quickChoices(qk());
     const at = choices.findIndex((c) => c.value === "verlag_gallimard");
-    stepQuickFilter(1);
-    expect(currentSheet().type.quickFilter?.value).toBe(choices[at + 1].value);
-    setQuickValue(choices[0].value);
-    stepQuickFilter(-1);
-    expect(currentSheet().type.quickFilter?.value).toBe(choices[0].value);
+    stepQuickFilter(qk(), 1);
+    expect(currentSheet().type.quickFilters?.[0]?.value).toBe(choices[at + 1].value);
+    setQuickValue(qk(), choices[0].value);
+    stepQuickFilter(qk(), -1);
+    expect(currentSheet().type.quickFilters?.[0]?.value).toBe(choices[0].value);
   });
 
   it("filters text columns by value", () => {
     useStore.getState().open(fromJSON(JSON.stringify(leMonde)), newDbInfo());
     startQuickFilter(col("Genre"), "text");
-    const first = quickChoices()[0];
-    expect(currentSheet().type.quickFilter?.value).toBe(first.label);
+    const first = quickChoices(qk())[0];
+    expect(currentSheet().type.quickFilters?.[0]?.value).toBe(first.label);
     expect(currentSheet().rows).toHaveLength(first.count);
   });
 
@@ -96,11 +97,11 @@ describe("quick filter", () => {
     useStore.getState().open(sampleGraph(), newDbInfo());
     useStore.getState().setActiveType("type_project");
     startQuickFilter(col("Deadline"), "year");
-    toggleQuickFilter();
-    expect(currentSheet().type.quickFilter).toMatchObject({ value: "2027", off: true });
+    toggleQuickFilter(qk());
+    expect(currentSheet().type.quickFilters?.[0]).toMatchObject({ value: "2027", off: true });
     expect(names()).toHaveLength(2);
-    toggleQuickFilter();
-    expect(currentSheet().type.quickFilter?.off).toBeUndefined();
+    toggleQuickFilter(qk());
+    expect(currentSheet().type.quickFilters?.[0]?.off).toBeUndefined();
     expect(names()).toEqual(["Cloud Portal"]);
   });
 
@@ -112,6 +113,34 @@ describe("quick filter", () => {
     expect(control).toContain('<input type="checkbox" checked>');
     expect(control).toContain(">Genre</span>");
     expect(control).toMatch(/<option value="Novel"[^>]*>Novel \(\d+\)<\/option>/);
-    expect(html).toContain('data-q="[&quot;Novel&quot;]"');
+    expect(html).toContain('data-q="{&quot;gattung&quot;:[&quot;Novel&quot;]}"');
+  });
+
+  it("several quick filters combine, each with its own value list", () => {
+    useStore.getState().open(fromJSON(JSON.stringify(leMonde)), newDbInfo());
+    startQuickFilter(col("Genre"), "text");
+    setQuickValue("gattung", "Novel");
+    startQuickFilter(col("Language"), "text");
+    setQuickValue("sprache", "English");
+    expect(currentSheet().type.quickFilters?.map((q) => [q.key, q.value])).toEqual([["gattung", "Novel"], ["sprache", "English"]]);
+    const rows = currentSheet().rows;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((n) => n.props.gattung === "Novel" && n.props.sprache === "English")).toBe(true);
+    // Language choices only list languages that occur among novels.
+    expect(quickChoices("sprache").every((c) => currentSheet().base.some((n) => n.props.gattung === "Novel" && n.props.sprache === c.value))).toBe(true);
+    toggleQuickFilter("gattung");
+    expect(currentSheet().rows.every((n) => n.props.sprache === "English")).toBe(true);
+    expect(currentSheet().rows.length).toBeGreaterThan(rows.length);
+    clearQuickFilter("sprache");
+    expect(currentSheet().type.quickFilters?.map((q) => q.key)).toEqual(["gattung"]);
+    const html = toHTML(useStore.getState().graph, "x", "https://zehrer.github.io/GridGraph/");
+    expect(html).toContain('<span class="qf off" data-key="gattung">');
+  });
+
+  it("migrates a single quick filter from older data", () => {
+    const g = sampleGraph() as ReturnType<typeof sampleGraph>;
+    (g.nodes.type_person as { quickFilter?: unknown }).quickFilter = { key: "age", unit: "number", value: "32" };
+    useStore.getState().open(g, newDbInfo());
+    expect(useStore.getState().graph.nodes.type_person.quickFilters).toEqual([{ key: "age", unit: "number", value: "32" }]);
   });
 });

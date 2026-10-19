@@ -1,4 +1,4 @@
-import type { Column, ColumnType, DerivedEdge, Graph, GraphNode, Value } from "./types";
+import type { Column, ColumnType, DerivedEdge, Graph, GraphNode, QuickFilter, SavedView, Value } from "./types";
 import { displayDate, displayNumber, formatBoolean, formatDate, formatNumber, formatPercent, isBoolean, parseBoolean, parseDate, parseNumber } from "./locale";
 
 export const PALETTE = ["#1a73e8", "#188038", "#e37400", "#9334e6", "#d01884", "#12b5cb", "#d93025", "#5f6368"];
@@ -135,7 +135,7 @@ export function removeColumn(g: Graph, typeId: string, key: string) {
   const t = g.nodes[typeId];
   if (t) t.columns = declareColumns(g, typeId).filter((c) => c.key !== key);
   if (t?.filters) delete t.filters[key];
-  if (t?.quickFilter?.key === key) delete t.quickFilter;
+  if (t?.quickFilters) t.quickFilters = t.quickFilters.filter((q) => q.key !== key);
   for (const inst of instancesOf(g, typeId)) delete inst.props[key];
 }
 
@@ -193,6 +193,18 @@ export function normalize(g: Graph): Graph {
       }
     }
     delete t.nameLabel;
+    // One quick filter per sheet (v0.6) became a list.
+    const legacy = t as GraphNode & { quickFilter?: QuickFilter };
+    if (legacy.quickFilter) {
+      t.quickFilters = [legacy.quickFilter];
+      delete legacy.quickFilter;
+    }
+    for (const v of (t.views ?? []) as (SavedView & { quick?: QuickFilter })[]) {
+      if (v.quick) {
+        v.quicks = [v.quick];
+        delete v.quick;
+      }
+    }
     let next = Math.max(t.nextNo ?? 1, ...insts.map((i) => (i.no ?? 0) + 1));
     for (const i of insts) i.no ??= next++;
     t.nextNo = next;

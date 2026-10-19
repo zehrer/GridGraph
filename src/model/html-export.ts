@@ -30,9 +30,10 @@ function cell(g: Graph, n: GraphNode, colKey: string): string {
 /** One table; only the "All rows" table carries the row anchors that links point to. */
 type Quick = { col: Column; unit: QuickFilter["unit"] };
 
-function table(g: Graph, t: GraphNode, cols: Column[], rows: GraphNode[], anchors: boolean, quick?: Quick): string {
-  // Each row carries the quick filter values it matches, for the page's quick filter control.
-  const q = (n: GraphNode) => (quick ? ` data-q="${esc(JSON.stringify(quickKeys(g, n, quick.col, quick.unit)))}"` : "");
+function table(g: Graph, t: GraphNode, cols: Column[], rows: GraphNode[], anchors: boolean, quicks: Quick[] = []): string {
+  // Each row carries the values it matches per quick filter column, for the page's quick filter controls.
+  const q = (n: GraphNode) =>
+    quicks.length ? ` data-q="${esc(JSON.stringify(Object.fromEntries(quicks.map((x) => [x.col.key, quickKeys(g, n, x.col, x.unit)]))))}"` : "";
   const head = `<tr><th class="id">ID</th>${cols.map((c) => `<th${c.key === t.nameKey ? ' class="name"' : ""}>${esc(c.label)}</th>`).join("")}</tr>`;
   const body = rows.map((n) => `<tr${anchors ? ` id="${anchor(n.id)}"` : ""}${q(n)}><td class="id">${n.no ?? ""}</td>${cols.map((c) => cell(g, n, c.key)).join("")}</tr>`).join("\n");
   const foot = cols.some((c) => c.summary)
@@ -51,7 +52,7 @@ function quickControl(g: Graph, quick: Quick, rows: GraphNode[], value: string, 
   const values = quickValues(g, quick.col, rows, quick.unit);
   if (!isListUnit(quick.unit)) values.sort((a, b) => (quick.unit === "number" ? Number(a.value) - Number(b.value) : a.value.localeCompare(b.value)));
   const options = values.map((v) => `<option value="${esc(v.value)}"${v.value === value ? " selected" : ""}>${esc(v.label)} (${v.count})</option>`).join("");
-  return `<span class="qf${on ? "" : " off"}"><label class="sw" title="Quick filter on/off"><input type="checkbox"${on ? " checked" : ""}><i></i></label><span class="qcol">${esc(quick.col.label)}</span><button type="button" data-step="-1" title="Previous">‹</button><select aria-label="Quick filter value">${options}</select><button type="button" data-step="1" title="Next">›</button></span>`;
+  return `<span class="qf${on ? "" : " off"}" data-key="${esc(quick.col.key)}"><label class="sw" title="Quick filter on/off"><input type="checkbox"${on ? " checked" : ""}><i></i></label><span class="qcol">${esc(quick.col.label)}</span><button type="button" data-step="-1" title="Previous">‹</button><select aria-label="Quick filter value">${options}</select><button type="button" data-step="1" title="Next">›</button></span>`;
 }
 
 /**
@@ -66,19 +67,24 @@ function sheet(g: Graph, t: GraphNode): string {
   const select = views.length
     ? `<select class="views" aria-label="Filter view"><option value="">All rows</option>${views.map((v) => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join("")}</select>`
     : "";
-  // The sheet's quick filter (or the first one saved in a view) becomes an interactive control.
-  const qf = t.quickFilter ?? views.find((v) => v.quick)?.quick;
-  const qcol = qf && columnsOf(g, t.id).find((c) => c.key === qf.key);
-  const quick = qf && qcol ? { col: qcol, unit: qf.unit } : undefined;
-  const control = quick && qf ? quickControl(g, quick, rows, qf.value, !qf.off) : "";
+  // The sheet's quick filters (plus those saved only in views) become interactive controls.
+  const defs = new Map<string, QuickFilter>();
+  for (const qf of [...(t.quickFilters ?? []), ...views.flatMap((v) => v.quicks ?? []).map((q) => ({ ...q, off: true }))]) if (!defs.has(qf.key)) defs.set(qf.key, qf);
+  const all = columnsOf(g, t.id);
+  const quicks = [...defs.values()].flatMap((qf) => {
+    const col = all.find((c) => c.key === qf.key);
+    return col ? [{ col, unit: qf.unit, qf }] : [];
+  });
+  const control = quicks.map((x) => quickControl(g, x, rows, x.qf.value, !x.qf.off)).join("");
   const viewTables = views.map((v) => {
     const vt = viewTable(g, t.id, v);
-    const vq = v.quick && v.quick.key === qf?.key ? ` data-q-value="${esc(v.quick.value)}" data-q-on="${v.quick.off ? "0" : "1"}"` : "";
-    return `<div class="view" data-view="${esc(v.id)}" data-count="${esc(count(vt.rows.length))}"${vq} hidden>${table(g, t, vt.columns, vt.rows, false, quick)}</div>`;
+    // A view saved with quick filters sets those controls when it is chosen.
+    const vq = v.quicks?.length ? ` data-quicks="${esc(JSON.stringify(Object.fromEntries(v.quicks.map((q) => [q.key, { value: q.value, on: !q.off }]))))}"` : "";
+    return `<div class="view" data-view="${esc(v.id)}" data-count="${esc(count(vt.rows.length))}"${vq} hidden>${table(g, t, vt.columns, vt.rows, false, quicks)}</div>`;
   });
   return `<section id="${anchor(t.id)}">
 <h2><i style="background:${esc(t.color)}"></i>${esc(t.label)} <small>${count(rows.length)}</small>${control}${select}</h2>
-<div class="view" data-view="" data-count="${esc(count(rows.length))}">${table(g, t, cols, rows, true, quick)}</div>
+<div class="view" data-view="" data-count="${esc(count(rows.length))}">${table(g, t, cols, rows, true, quicks)}</div>
 ${viewTables.join("\n")}
 </section>`;
 }
@@ -110,6 +116,7 @@ export function toHTML(g: Graph, name: string, appUrl: string): string {
   h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 500; margin: 28px 0 8px; }
   h2 i { width: 12px; height: 12px; border-radius: 3px; }
   h2 small { color: #5f6368; font-weight: 400; font-size: 13px; }
+  h2 .qf + .qf { margin-left: 6px; }
   h2 .qf { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 8px; border-radius: 14px; background: #ceead6; color: #0d652d; font-size: 13px; font-weight: 400; }
   h2 .qf.off { background: #e8eaed; color: #5f6368; }
   h2 .qf .qcol { margin: 0 2px 0 4px; }
@@ -155,23 +162,29 @@ ${types.map((t) => sheet(g, t)).join("\n")}
   // Filter views: show the chosen precomputed table of a sheet.
   function showView(section, id) {
     section.querySelectorAll(".view").forEach(function (v) { v.hidden = v.getAttribute("data-view") !== id; });
-    var shown = section.querySelector(".view:not([hidden])"), qf = section.querySelector(".qf");
-    // A view saved with a quick filter brings its value along.
-    if (qf && shown && shown.hasAttribute("data-q-value")) {
-      qf.querySelector("select").value = shown.getAttribute("data-q-value");
-      qf.querySelector("input").checked = shown.getAttribute("data-q-on") === "1";
-    }
+    var shown = section.querySelector(".view:not([hidden])");
+    // A view saved with quick filters brings their values along.
+    var saved = shown && shown.getAttribute("data-quicks") ? JSON.parse(shown.getAttribute("data-quicks")) : {};
+    section.querySelectorAll(".qf").forEach(function (qf) {
+      var q = saved[qf.getAttribute("data-key")];
+      if (q) { qf.querySelector("select").value = q.value; qf.querySelector("input").checked = q.on; }
+    });
     applyQuick(section);
   }
-  // Quick filter: hide rows whose values do not include the chosen one; precomputed summaries are hidden meanwhile.
+  // Quick filters: a row stays when it matches every switched-on control; precomputed summaries are hidden meanwhile.
   function applyQuick(section) {
-    var qf = section.querySelector(".qf");
-    var on = qf ? qf.querySelector("input").checked : false, value = qf ? qf.querySelector("select").value : "";
-    if (qf) qf.classList.toggle("off", !on);
+    var active = [];
+    section.querySelectorAll(".qf").forEach(function (qf) {
+      var on = qf.querySelector("input").checked;
+      qf.classList.toggle("off", !on);
+      if (on) active.push({ key: qf.getAttribute("data-key"), value: qf.querySelector("select").value });
+    });
+    var on = active.length > 0;
     section.querySelectorAll(".view").forEach(function (v) {
       var n = 0;
       v.querySelectorAll("tbody tr").forEach(function (tr) {
-        var show = !on || JSON.parse(tr.getAttribute("data-q") || "[]").indexOf(value) >= 0;
+        var q = JSON.parse(tr.getAttribute("data-q") || "{}");
+        var show = active.every(function (a) { return (q[a.key] || []).indexOf(a.value) >= 0; });
         tr.hidden = !show;
         if (show) n++;
       });
@@ -205,7 +218,7 @@ ${types.map((t) => sheet(g, t)).join("\n")}
     var section = row.closest("section"), sel = section.querySelector("select.views");
     if (sel) { sel.value = ""; showView(section, ""); }
     // Still hidden by the quick filter: switch it off.
-    if (!row.offsetParent && section.querySelector(".qf")) { section.querySelector(".qf input").checked = false; applyQuick(section); }
+    if (!row.offsetParent) { section.querySelectorAll(".qf input").forEach(function (i) { i.checked = false; }); applyQuick(section); }
   });
   // Opens GridGraph and hands over the embedded data once it reports that it is ready.
   document.getElementById("open-in-gridgraph").onclick = function () {

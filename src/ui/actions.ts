@@ -245,70 +245,83 @@ export function setColumnFilter(key: string, f?: ColumnFilter) {
 
 export const clearFilters = () => editType((t) => void delete t.filters);
 
-// --- Quick filter (toolbar) ---
+// --- Quick filters (toolbar), at most one per column ---
 
-/** Column menu → Quick filter: starts at the selected cell's period, else at the latest period with data. */
+const quickOf = (key: string) => currentSheet().type.quickFilters?.find((q) => q.key === key);
+
+/** Replaces (or with undefined removes) the quick filter of a column. */
+function setQuick(key: string, qf: QuickFilter | undefined) {
+  editType((t) => {
+    const list = (t.quickFilters ?? []).filter((q) => q.key !== key);
+    const i = (t.quickFilters ?? []).findIndex((q) => q.key === key);
+    if (qf) list.splice(i < 0 ? list.length : i, 0, qf);
+    if (list.length) t.quickFilters = list;
+    else delete t.quickFilters;
+  });
+}
+
+/** Column menu → Quick filter: adds one (or retargets the column's); starts at the selected cell's value, else at the latest period / first value. */
 export function startQuickFilter(col: number, unit: QuickFilter["unit"]) {
   const { graph, sel } = useStore.getState();
   const m = currentSheet();
   const c = m.columns[col - 1];
   if (!c) return;
   const node = sel.col === col ? m.rows[sel.row - 1] : undefined;
-  const first = isListUnit(unit) ? quickValues(graph, c, m.base, unit)[0]?.value : periodsOf(graph, c, m.base, unit)[0];
+  // Start with a value that still has rows under the other filters.
+  const left = applyFilters(graph, m.type, m.all, m.base, c.key);
+  const first = isListUnit(unit) ? quickValues(graph, c, left, unit)[0]?.value : periodsOf(graph, c, left, unit)[0];
   const value = (node && periodOf(graph, node, c, unit)) ?? first;
   if (!value) return alert(`"${c.label}" has no values to filter by.`);
-  editType((t) => (t.quickFilter = { key: c.key, unit, value }));
+  setQuick(c.key, { key: c.key, unit, value });
 }
 
-/** Values a list quick filter steps through: those left by the other filters. */
-export function quickChoices() {
+/** Values a list quick filter steps through: those left by all other filters. */
+export function quickChoices(key: string) {
   const { graph } = useStore.getState();
   const m = currentSheet();
-  const qf = m.type.quickFilter;
-  const c = qf && m.all.find((x) => x.key === qf.key);
-  return qf && c ? quickValues(graph, c, applyFilters(graph, m.type, m.all, m.base, qf.key), qf.unit) : [];
+  const qf = quickOf(key);
+  const c = m.all.find((x) => x.key === key);
+  return qf && c ? quickValues(graph, c, applyFilters(graph, m.type, m.all, m.base, key), qf.unit) : [];
 }
 
 /** ‹ ›: dates and numbers step like a calendar; links and texts move to the previous/next existing value. */
-export function stepQuickFilter(delta: number) {
-  const qf = currentSheet().type.quickFilter;
+export function stepQuickFilter(key: string, delta: number) {
+  const qf = quickOf(key);
   if (!qf) return;
   let value = stepPeriod(qf.unit, qf.value, delta);
   if (isListUnit(qf.unit)) {
-    const list = quickChoices();
+    const list = quickChoices(key);
     const next = list[list.findIndex((v) => v.value === qf.value) + delta];
     if (!next) return;
     value = next.value;
   }
-  // Choosing a value switches the quick filter on again.
-  editType((t) => (t.quickFilter = { key: qf.key, unit: qf.unit, value }));
+  // Stepping switches the quick filter on again.
+  setQuick(key, { key, unit: qf.unit, value });
 }
 
-export function setQuickValue(value: string) {
-  const qf = currentSheet().type.quickFilter;
-  if (qf) editType((t) => (t.quickFilter = { key: qf.key, unit: qf.unit, value }));
+export function setQuickValue(key: string, value: string) {
+  const qf = quickOf(key);
+  if (qf) setQuick(key, { key, unit: qf.unit, value });
 }
 
 /** Switches a date quick filter between year and month, staying in the same year. */
-export function toggleQuickUnit() {
+export function toggleQuickUnit(key: string) {
   const { graph } = useStore.getState();
   const m = currentSheet();
-  const qf = m.type.quickFilter;
-  const c = qf && m.all.find((x) => x.key === qf.key);
-  if (!qf || !c || qf.unit === "number") return;
-  const quick: QuickFilter =
-    qf.unit === "month"
-      ? { ...qf, unit: "year", value: qf.value.slice(0, 4) }
-      : { ...qf, unit: "month", value: periodsOf(graph, c, m.base, "month").find((p) => p.startsWith(qf.value)) ?? `${qf.value}-01` };
-  editType((t) => (t.quickFilter = quick));
+  const qf = quickOf(key);
+  const c = m.all.find((x) => x.key === key);
+  if (!qf || !c || (qf.unit !== "year" && qf.unit !== "month")) return;
+  setQuick(key, qf.unit === "month"
+    ? { ...qf, unit: "year", value: qf.value.slice(0, 4) }
+    : { ...qf, unit: "month", value: periodsOf(graph, c, m.base, "month").find((p) => p.startsWith(qf.value)) ?? `${qf.value}-01` });
 }
 
-export const clearQuickFilter = () => editType((t) => void delete t.quickFilter);
+export const clearQuickFilter = (key: string) => setQuick(key, undefined);
 
-/** Switches the quick filter off (all rows) or on again, keeping its column and value. */
-export function toggleQuickFilter() {
-  const qf = currentSheet().type.quickFilter;
-  if (qf) editType((t) => (t.quickFilter = qf.off ? { key: qf.key, unit: qf.unit, value: qf.value } : { ...qf, off: true }));
+/** Switches a quick filter off (all rows) or on again, keeping its column and value. */
+export function toggleQuickFilter(key: string) {
+  const qf = quickOf(key);
+  if (qf) setQuick(key, qf.off ? { key, unit: qf.unit, value: qf.value } : { ...qf, off: true });
 }
 
 // --- Filter views ---

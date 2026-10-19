@@ -36,7 +36,7 @@ export interface SavedView {
   columns: string[];
   filters: Record<string, ColumnFilter>;
   sort?: SortOrder;
-  quick?: QuickFilter;
+  quicks?: QuickFilter[];
 }
 
 /** Aggregate shown in the sheet footer. */
@@ -85,7 +85,8 @@ export interface GraphNode {
   /** Saved filter views, and the one last applied (to show when it was changed since). */
   views?: SavedView[];
   activeView?: string;
-  quickFilter?: QuickFilter;
+  /** Toolbar quick filters, at most one per column; the active ones combine. */
+  quickFilters?: QuickFilter[];
   // Instances only:
   /** ID shown in the sheet: running number per type, assigned on creation. */
   no?: number;

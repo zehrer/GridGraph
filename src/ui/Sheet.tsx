@@ -164,7 +164,7 @@ export function Sheet() {
   const quickItems = (col: number): MenuItem[] => {
     const c = m.columns[col - 1];
     const kinds = new Set(m.base.map((n) => shownColumn(graph, n, c).col.type));
-    const qf = m.type.quickFilter?.key === c.key ? m.type.quickFilter : undefined;
+    const qf = m.type.quickFilters?.find((q) => q.key === c.key);
     const item = (unit: QuickFilter["unit"], label: string): MenuItem => ({ label: `${qf?.unit === unit ? "✓ " : ""}${label}`, action: () => A.startQuickFilter(col, unit) });
     if (kinds.has("date") || c.type === "date") return [item("year", "Quick filter by year"), item("month", "Quick filter by month")];
     if (kinds.has("number") || c.type === "number") return [item("number", "Quick filter by value")];

@@ -96,9 +96,10 @@ export const isActive = (f?: ColumnFilter) => !!f && (!!f.values || !!f.conditio
 
 /** Rows that pass every active filter of the type, optionally ignoring one column (for its value list). */
 export function applyFilters(g: Graph, type: GraphNode, columns: Column[], rows: GraphNode[], exceptKey?: string): GraphNode[] {
-  const qf = type.quickFilter;
-  const qcol = qf && qf.key !== exceptKey ? columns.find((c) => c.key === qf.key) : undefined;
-  if (qf && qcol && !qf.off) rows = rows.filter((n) => quickKeys(g, n, qcol, qf.unit).includes(qf.value));
+  for (const qf of type.quickFilters ?? []) {
+    const qcol = !qf.off && qf.key !== exceptKey ? columns.find((c) => c.key === qf.key) : undefined;
+    if (qcol) rows = rows.filter((n) => quickKeys(g, n, qcol, qf.unit).includes(qf.value));
+  }
   if (!type.filterOn || !type.filters) return rows;
   const active = columns.filter((c) => c.key !== exceptKey && isActive(type.filters![c.key]));
   return active.length ? rows.filter((n) => active.every((c) => passes(g, n, c, type.filters![c.key]))) : rows;
@@ -184,7 +185,7 @@ export function distinctValues(g: Graph, col: Column, rows: GraphNode[]): { key:
 export function filteredOut(g: Graph): Set<string> {
   const out = new Set<string>();
   for (const t of typesOf(g)) {
-    if (!t.quickFilter && (!t.filterOn || !Object.keys(t.filters ?? {}).length)) continue;
+    if (!t.quickFilters?.some((q) => !q.off) && (!t.filterOn || !Object.keys(t.filters ?? {}).length)) continue;
     const rows = instancesOf(g, t.id);
     const kept = new Set(applyFilters(g, t, columnsOf(g, t.id), rows).map((n) => n.id));
     for (const n of rows) if (!kept.has(n.id)) out.add(n.id);
