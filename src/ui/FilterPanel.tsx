@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useStore } from "../model/store";
 import { CONDITIONS, applyFilters, distinctValues } from "../model/filter";
 import type { FilterOp } from "../model/types";
@@ -19,6 +19,8 @@ export function FilterPanel({ colKey, at, onClose }: { colKey: string; at: { x: 
   const [b, setB] = useState(current?.condition?.b ?? "");
   const args = CONDITIONS.find(([o]) => o === op)?.[2] ?? 0;
   const shown = values.filter((v) => v.label.toLowerCase().includes(search.trim().toLowerCase()));
+  // Dates are listed like in Excel: year ▸ month ▸ day.
+  const dateTree = values.some((v) => ISO.test(v.key)) && values.every((v) => v.key === "" || ISO.test(v.key));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -70,18 +72,22 @@ export function FilterPanel({ colKey, at, onClose }: { colKey: string; at: { x: 
           <span>{checked.size} selected</span>
         </div>
         <input placeholder="Search values" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <ul>
-          {shown.map((v) => (
-            <li key={v.key}>
-              <label>
-                <input type="checkbox" checked={checked.has(v.key)} onChange={() => toggle(v.key)} />
-                <span className={v.key === "" ? "blank" : ""}>{v.label}</span>
-                <small>{v.count}</small>
-              </label>
-            </li>
-          ))}
-          {!shown.length && <li className="none">No matching values</li>}
-        </ul>
+        {dateTree && !search.trim() ? (
+          <DateTree values={values} checked={checked} setChecked={setChecked} toggle={toggle} />
+        ) : (
+          <ul>
+            {shown.map((v) => (
+              <li key={v.key}>
+                <label>
+                  <input type="checkbox" checked={checked.has(v.key)} onChange={() => toggle(v.key)} />
+                  <span className={v.key === "" ? "blank" : ""}>{v.label}</span>
+                  <small>{v.count}</small>
+                </label>
+              </li>
+            ))}
+            {!shown.length && <li className="none">No matching values</li>}
+          </ul>
+        )}
 
         <footer>
           <button onClick={() => (setColumnFilter(colKey, undefined), onClose())} disabled={!current}>Clear filter</button>
@@ -91,5 +97,79 @@ export function FilterPanel({ colKey, at, onClose }: { colKey: string; at: { x: 
         </footer>
       </div>
     </div>
+  );
+}
+
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+type Value = { key: string; label: string; count: number };
+
+/** Excel-style date list: years and months with (partial) checkboxes and counts; expand to the days. */
+function DateTree({ values, checked, setChecked, toggle }: { values: Value[]; checked: Set<string>; setChecked: (s: Set<string>) => void; toggle: (key: string) => void }) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const groups = new Map<string, Map<string, Value[]>>();
+  for (const v of values) {
+    if (!v.key) continue;
+    const [y, m] = [v.key.slice(0, 4), v.key.slice(0, 7)];
+    if (!groups.has(y)) groups.set(y, new Map());
+    const months = groups.get(y)!;
+    if (!months.has(m)) months.set(m, []);
+    months.get(m)!.push(v);
+  }
+  const blank = values.find((v) => v.key === "");
+
+  const node = (id: string, label: ReactNode, items: Value[], depth: number, children?: ReactNode) => {
+    const keys = items.map((v) => v.key);
+    const on = keys.filter((k) => checked.has(k)).length;
+    const setAll = () => {
+      const next = new Set(checked);
+      for (const k of keys) on === keys.length ? next.delete(k) : next.add(k);
+      setChecked(next);
+    };
+    const expanded = open.has(id);
+    return (
+      <li key={id}>
+        <label style={{ paddingLeft: 8 + depth * 16 }}>
+          <button type="button" className="twisty" onClick={(e) => (e.preventDefault(), setOpen(new Set(expanded ? [...open].filter((x) => x !== id) : [...open, id])))}>
+            {expanded ? "▾" : "▸"}
+          </button>
+          <input type="checkbox" checked={on === keys.length} ref={(el) => void (el && (el.indeterminate = on > 0 && on < keys.length))} onChange={setAll} />
+          <span>{label}</span>
+          <small>{items.reduce((a, v) => a + v.count, 0)}</small>
+        </label>
+        {expanded && <ul className="sub">{children}</ul>}
+      </li>
+    );
+  };
+  const monthName = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString(undefined, { month: "long", timeZone: "UTC" });
+
+  return (
+    <ul className="date-tree">
+      {blank && (
+        <li>
+          <label style={{ paddingLeft: 30 }}>
+            <input type="checkbox" checked={checked.has("")} onChange={() => toggle("")} />
+            <span className="blank">(Blanks)</span>
+            <small>{blank.count}</small>
+          </label>
+        </li>
+      )}
+      {[...groups].map(([y, months]) =>
+        node(y, y, [...months.values()].flat(), 0,
+          [...months].map(([m, days]) =>
+            node(m, monthName(m), days, 1,
+              days.map((d) => (
+                <li key={d.key}>
+                  <label style={{ paddingLeft: 8 + 2 * 16 + 22 }}>
+                    <input type="checkbox" checked={checked.has(d.key)} onChange={() => toggle(d.key)} />
+                    <span>{d.label}</span>
+                    <small>{d.count}</small>
+                  </label>
+                </li>
+              )),
+            ),
+          ),
+        ),
+      )}
+    </ul>
   );
 }

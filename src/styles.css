@@ -305,3 +305,12 @@ main { flex: 1; min-height: 0; display: flex; }
 .graph-tools button.filtered { background: #ceead6; color: #0d652d; }
 .graph-tools button.filtered .funnel { fill: currentColor; }
 .tab.hidden-sheet span { font-style: italic; opacity: 0.7; }
+.quick-filter { display: flex; align-items: center; gap: 2px; height: 28px; margin-right: 6px; padding: 0 4px 0 10px; border-radius: 14px; background: #ceead6; color: #0d652d; white-space: nowrap; }
+.quick-filter .col { font-size: 12px; margin-right: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.quick-filter button { border: 0; background: none; color: inherit; border-radius: 10px; min-width: 22px; height: 22px; padding: 0 4px; }
+.quick-filter button:hover:not(:disabled) { background: rgb(13 101 45 / 12%); }
+.quick-filter .period { font-weight: 600; min-width: 56px; }
+.quick-filter .period:disabled { opacity: 1; cursor: default; }
+.quick-filter .clear { font-size: 11px; }
+.filter-panel ul.sub { border: 0; max-height: none; min-height: 0; padding: 0; overflow: visible; }
+.filter-panel .twisty { border: 0; background: none; width: 16px; padding: 0; color: var(--muted); font-size: 11px; }

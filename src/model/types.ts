@@ -12,6 +12,12 @@ export interface ColumnFilter {
   condition?: { op: FilterOp; a?: string; b?: string };
 }
 
+/**
+ * Toolbar quick filter: shows the rows whose value in a column falls into one period, browsable
+ * with ‹ ›. `value` is "2026" (year), "2026-05" (month) or a number (number columns).
+ */
+export interface QuickFilter { key: string; unit: "year" | "month" | "number"; value: string }
+
 /** Sort order of a sheet; key "" sorts by ID. */
 export interface SortOrder { key: string; asc: boolean }
 
@@ -23,6 +29,7 @@ export interface SavedView {
   columns: string[];
   filters: Record<string, ColumnFilter>;
   sort?: SortOrder;
+  quick?: QuickFilter;
 }
 
 /** Aggregate shown in the sheet footer. */
@@ -71,6 +78,7 @@ export interface GraphNode {
   /** Saved filter views, and the one last applied (to show when it was changed since). */
   views?: SavedView[];
   activeView?: string;
+  quickFilter?: QuickFilter;
   // Instances only:
   /** ID shown in the sheet: running number per type, assigned on creation. */
   no?: number;

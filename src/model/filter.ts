@@ -6,7 +6,7 @@
 import { columnsOf, displayValue, instancesOf, linkIds, nodeName, rawValue, typesOf } from "./graph";
 import { shownColumn } from "./formula";
 import { parseDate, parseNumber } from "./locale";
-import type { Column, ColumnFilter, FilterOp, Graph, GraphNode } from "./types";
+import type { Column, ColumnFilter, FilterOp, Graph, GraphNode, QuickFilter } from "./types";
 
 export const CONDITIONS: [FilterOp, string, number][] = [
   ["empty", "Is empty", 0],
@@ -96,9 +96,43 @@ export const isActive = (f?: ColumnFilter) => !!f && (!!f.values || !!f.conditio
 
 /** Rows that pass every active filter of the type, optionally ignoring one column (for its value list). */
 export function applyFilters(g: Graph, type: GraphNode, columns: Column[], rows: GraphNode[], exceptKey?: string): GraphNode[] {
+  const qf = type.quickFilter;
+  const qcol = qf && qf.key !== exceptKey ? columns.find((c) => c.key === qf.key) : undefined;
+  if (qf && qcol) rows = rows.filter((n) => periodOf(g, n, qcol, qf.unit) === qf.value);
   if (!type.filterOn || !type.filters) return rows;
   const active = columns.filter((c) => c.key !== exceptKey && isActive(type.filters![c.key]));
   return active.length ? rows.filter((n) => active.every((c) => passes(g, n, c, type.filters![c.key]))) : rows;
+}
+
+// --- Quick filter periods ---
+
+/** Period of a cell for the quick filter: "2026" (year), "2026-05" (month) or the number itself; undefined when empty. */
+export function periodOf(g: Graph, node: GraphNode, col: Column, unit: QuickFilter["unit"]): string | undefined {
+  const { value } = shownColumn(g, node, col);
+  if (unit === "number") return typeof value === "number" ? String(value) : undefined;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}/.test(value)) return undefined;
+  return unit === "year" ? value.slice(0, 4) : value.slice(0, 7);
+}
+
+/** The period before or after `value` (‹ ›). */
+export function stepPeriod(unit: QuickFilter["unit"], value: string, delta: number): string {
+  if (unit !== "month") return String(Number(value) + delta);
+  const [y, m] = value.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return d.toISOString().slice(0, 7);
+}
+
+/** Text for the toolbar, e.g. "2026" or "May 2026". */
+export function periodLabel(unit: QuickFilter["unit"], value: string): string {
+  if (unit !== "month") return value;
+  const [y, m] = value.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+/** Which periods hold rows, latest first – to start a quick filter where the data is. */
+export function periodsOf(g: Graph, col: Column, rows: GraphNode[], unit: QuickFilter["unit"]): string[] {
+  const set = new Set(rows.map((n) => periodOf(g, n, col, unit)).filter((p): p is string => !!p));
+  return [...set].sort((a, b) => (unit === "number" ? Number(b) - Number(a) : b.localeCompare(a)));
 }
 
 /** Distinct keys of a column with their counts, blanks first, then sorted like the column. */
@@ -124,7 +158,7 @@ export function distinctValues(g: Graph, col: Column, rows: GraphNode[]): { key:
 export function filteredOut(g: Graph): Set<string> {
   const out = new Set<string>();
   for (const t of typesOf(g)) {
-    if (!t.filterOn || !Object.keys(t.filters ?? {}).length) continue;
+    if (!t.quickFilter && (!t.filterOn || !Object.keys(t.filters ?? {}).length)) continue;
     const rows = instancesOf(g, t.id);
     const kept = new Set(applyFilters(g, t, columnsOf(g, t.id), rows).map((n) => n.id));
     for (const n of rows) if (!kept.has(n.id)) out.add(n.id);

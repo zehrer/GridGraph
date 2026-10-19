@@ -32,6 +32,7 @@ export function captureView(g: Graph, typeId: string, name: string, sort: SortOr
     columns: columnsOf(g, typeId).filter((c) => !c.hidden).map((c) => c.key),
     filters: t.filterOn ? structuredClone(t.filters ?? {}) : {},
     ...(sort && { sort: { ...sort } }),
+    ...(t.quickFilter && { quick: { ...t.quickFilter } }),
   };
 }
 
@@ -45,6 +46,8 @@ export function applyView(g: Graph, typeId: string, view: SavedView) {
   const filters = Object.fromEntries(Object.entries(view.filters).filter(([k]) => cols.some((c) => c.key === k)));
   t.filters = structuredClone(filters);
   t.filterOn = Object.keys(filters).length > 0;
+  if (view.quick && cols.some((c) => c.key === view.quick!.key)) t.quickFilter = { ...view.quick };
+  else delete t.quickFilter;
   t.activeView = view.id;
 }
 
@@ -54,6 +57,7 @@ export function resetView(g: Graph, typeId: string) {
   t.columns = declareColumns(g, typeId).map((c) => ({ ...c, hidden: false }));
   delete t.filters;
   t.filterOn = false;
+  delete t.quickFilter;
   delete t.activeView;
 }
 
@@ -62,14 +66,14 @@ export function viewModified(g: Graph, typeId: string, sort: SortOrder | null): 
   const t = g.nodes[typeId];
   const view = t.views?.find((v) => v.id === t.activeView);
   if (!view) return false;
-  const essence = (v: SavedView) => JSON.stringify([v.columns, v.filters, v.sort ?? null]);
+  const essence = (v: SavedView) => JSON.stringify([v.columns, v.filters, v.sort ?? null, v.quick ?? null]);
   return essence(captureView(g, typeId, view.name, sort, view.id)) !== essence(view);
 }
 
 /** Columns and rows a view shows, for the HTML export. */
 export function viewTable(g: Graph, typeId: string, view: SavedView): { columns: Column[]; rows: GraphNode[] } {
   const all = columnsOf(g, typeId);
-  const t = { ...g.nodes[typeId], filterOn: true, filters: view.filters };
+  const t = { ...g.nodes[typeId], filterOn: true, filters: view.filters, quickFilter: view.quick };
   const rows = sortRows(g, all, applyFilters(g, t, all, instancesOf(g, typeId)), view.sort);
   return { columns: view.columns.map((k) => all.find((c) => c.key === k)).filter((c): c is Column => !!c), rows };
 }

@@ -8,8 +8,8 @@ import { sampleGraph } from "../model/sample";
 import { deleteDatabase, openNew } from "../model/persist";
 import { rangeOf, useStore, type Cell } from "../model/store";
 import { parseClipboard, toHTML, toTSV, type Matrix } from "../model/clipboard";
-import type { Column, ColumnFilter, Graph, GraphNode, Summary, Value } from "../model/types";
-import { applyFilters, cellKeys, isActive } from "../model/filter";
+import type { Column, ColumnFilter, Graph, GraphNode, QuickFilter, Summary, Value } from "../model/types";
+import { applyFilters, cellKeys, isActive, periodOf, periodsOf, stepPeriod } from "../model/filter";
 import { applyView, captureView, resetView, sortRows } from "../model/views";
 
 export interface SheetModel {
@@ -244,6 +244,41 @@ export function setColumnFilter(key: string, f?: ColumnFilter) {
 }
 
 export const clearFilters = () => editType((t) => void delete t.filters);
+
+// --- Quick filter (toolbar) ---
+
+/** Column menu → Quick filter: starts at the selected cell's period, else at the latest period with data. */
+export function startQuickFilter(col: number, unit: QuickFilter["unit"]) {
+  const { graph, sel } = useStore.getState();
+  const m = currentSheet();
+  const c = m.columns[col - 1];
+  if (!c) return;
+  const node = sel.col === col ? m.rows[sel.row - 1] : undefined;
+  const value = (node && periodOf(graph, node, c, unit)) ?? periodsOf(graph, c, m.base, unit)[0];
+  if (!value) return alert(`"${c.label}" has no ${unit === "number" ? "numbers" : "dates"} to filter by.`);
+  editType((t) => (t.quickFilter = { key: c.key, unit, value }));
+}
+
+export function stepQuickFilter(delta: number) {
+  const qf = currentSheet().type.quickFilter;
+  if (qf) editType((t) => (t.quickFilter = { ...qf, value: stepPeriod(qf.unit, qf.value, delta) }));
+}
+
+/** Switches a date quick filter between year and month, staying in the same year. */
+export function toggleQuickUnit() {
+  const { graph } = useStore.getState();
+  const m = currentSheet();
+  const qf = m.type.quickFilter;
+  const c = qf && m.all.find((x) => x.key === qf.key);
+  if (!qf || !c || qf.unit === "number") return;
+  const quick: QuickFilter =
+    qf.unit === "month"
+      ? { ...qf, unit: "year", value: qf.value.slice(0, 4) }
+      : { ...qf, unit: "month", value: periodsOf(graph, c, m.base, "month").find((p) => p.startsWith(qf.value)) ?? `${qf.value}-01` };
+  editType((t) => (t.quickFilter = quick));
+}
+
+export const clearQuickFilter = () => editType((t) => void delete t.quickFilter);
 
 // --- Filter views ---
 

@@ -160,6 +160,16 @@ export function Sheet() {
 
   // --- Menus ---
 
+  /** Quick filter entries for date columns (year / month) and number columns. */
+  const quickItems = (col: number): MenuItem[] => {
+    const c = m.columns[col - 1];
+    const kinds = new Set(m.base.map((n) => shownColumn(graph, n, c).col.type));
+    const qf = m.type.quickFilter?.key === c.key ? m.type.quickFilter : undefined;
+    const item = (unit: "year" | "month" | "number", label: string): MenuItem => ({ label: `${qf?.unit === unit ? "✓ " : ""}${label}`, action: () => A.startQuickFilter(col, unit) });
+    if (kinds.has("date") || c.type === "date") return [item("year", "Quick filter by year"), item("month", "Quick filter by month")];
+    if (kinds.has("number") || c.type === "number") return [item("number", "Quick filter by value")];
+    return [];
+  };
   const columnMenu = (col: number): MenuItem[] => {
     if (col === 0) return [{ label: "Sort by ID", action: () => A.sortBy(0, true) }, { label: "Renumber IDs…", action: A.renumberIds }];
     const c = m.columns[col - 1];
@@ -172,6 +182,7 @@ export function Sheet() {
       { label: "Move left", disabled: col <= 1, action: () => A.moveColumnTo(col, col - 1) },
       { label: "Move right", disabled: col >= m.columns.length, action: () => A.moveColumnTo(col, col + 1) },
       { label: `${c.wrap ? "✓ " : ""}Wrap text`, action: () => A.toggleWrap(col) },
+      ...quickItems(col),
       { label: isName ? "✓ Name column" : "Use as name column", disabled: isName || c.type === "relation" || c.type === "formula", action: () => A.setNameColumn(col) },
       ...(c.type === "formula"
         ? [{ label: "Edit formula…", action: () => A.openFormula(c.key) }, { label: "Convert to values", action: () => A.convertToValues(col) }]

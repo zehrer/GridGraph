@@ -32,6 +32,7 @@ Live: https://zehrer.github.io/GridGraph/
 | Format | Format menu: data type, number format (€, $, %, decimals) and date format (e.g. DD.MM.YYYY) of the selected columns |
 | Settings | View → Settings: rows/columns shown at least; number and date notation (e.g. German 1.234,56 · 25.11.2026) |
 | Sort / filter | Data → Create a filter (⇧⌘F): filter button per column with conditions and a value list, like Excel; ⌘F searches rows |
+| Quick filter | Column menu → Quick filter by year/month (dates) or value (numbers): browse with ‹ › in the toolbar |
 | Filter views | Toolbar view selector: save filters, visible columns, their order and sort under a name; also in the HTML export |
 | Undo / redo | ⌘Z / ⇧⌘Z |
 | Graph | Drag = move node or view, wheel = zoom, double-click = open in table |

@@ -56,6 +56,7 @@ export const formatNumber = (n: number) => String(n).replace(".", decimal);
 
 /** Number formats of a column; without one, numbers show in the locale's default notation. */
 export const NUMBER_FORMATS = [
+  ["plain", "Plain (no separators)", "1979"],
   ["integer", "Integer", "1,235"],
   ["decimal2", "2 decimals", "1,234.50"],
   ["EUR", "Euro", "€1,234.50"],
@@ -65,7 +66,8 @@ export const NUMBER_FORMATS = [
 
 export function displayNumber(n: number, format?: string): string {
   const options: Intl.NumberFormatOptions =
-    format === "integer" ? { maximumFractionDigits: 0 }
+    format === "plain" ? { useGrouping: false, maximumFractionDigits: 10 }
+    : format === "integer" ? { maximumFractionDigits: 0 }
     : format === "decimal2" ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
     : format === "EUR" || format === "USD" ? { style: "currency", currency: format }
     : format === "percent" ? { style: "percent", maximumFractionDigits: 2 }

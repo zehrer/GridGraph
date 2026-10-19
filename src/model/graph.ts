@@ -135,6 +135,7 @@ export function removeColumn(g: Graph, typeId: string, key: string) {
   const t = g.nodes[typeId];
   if (t) t.columns = declareColumns(g, typeId).filter((c) => c.key !== key);
   if (t?.filters) delete t.filters[key];
+  if (t?.quickFilter?.key === key) delete t.quickFilter;
   for (const inst of instancesOf(g, typeId)) delete inst.props[key];
 }
 
