@@ -70,6 +70,9 @@ main { flex: 1; min-height: 0; display: flex; }
 .toolbar > button:hover:not(:disabled), .toolbar select:hover:not(:disabled) { background: rgb(68 71 70 / 8%); }
 .toolbar .sep { width: 1px; height: 20px; background: #c7c7c7; margin: 0 6px; }
 .toolbar .search { border: 0; border-radius: 14px; padding: 4px 12px; width: 160px; background: rgb(255 255 255 / 70%); }
+/* Items keep their size; on narrow windows the toolbar scrolls instead of squeezing them. */
+.toolbar > * { flex: none; }
+.toolbar > button { white-space: nowrap; }
 .toolbar .spacer { flex: 1; }
 .segmented { display: flex; background: var(--surface); border-radius: 14px; padding: 2px; flex: none; }
 .segmented button { border: 0; background: none; border-radius: 12px; padding: 3px 12px; }

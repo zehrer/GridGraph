@@ -26,17 +26,21 @@ export function viewItems(): MenuItem[] {
 /** Toolbar button showing the active filter view, with a dot when it was changed since it was applied. */
 export function ViewSelector({ disabled }: { disabled: boolean }) {
   const { graph, activeTypeId, sort } = useStore();
-  const [open, setOpen] = useState(false);
+  // Opened at a viewport point: the toolbar scrolls horizontally and would clip a menu placed inside it.
+  const [open, setOpen] = useState<{ x: number; y: number } | null>(null);
   const t = graph.nodes[activeTypeId];
   const active = t?.views?.find((v) => v.id === t.activeView);
   const modified = viewModified(graph, activeTypeId, sort);
   return (
     <div className="menu-anchor">
-      <button className="view-select" disabled={disabled} title={modified ? "Changed since the view was applied" : "Filter views"} onClick={() => setOpen(true)}>
+      <button className="view-select" disabled={disabled} title={modified ? "Changed since the view was applied" : "Filter views"} onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setOpen({ x: r.left, y: r.bottom + 2 });
+        }}>
         {active ? active.name : "All rows"}
         {modified && <span className="dot">•</span>} ▾
       </button>
-      {open && <MenuList items={viewItems()} onClose={() => setOpen(false)} />}
+      {open && <MenuList items={viewItems()} at={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
