@@ -295,3 +295,6 @@ main { flex: 1; min-height: 0; display: flex; }
 .toolbar > button.on .funnel { fill: currentColor; }
 .row-count { margin-left: auto; flex: none; align-self: center; color: #0d652d; font-size: 13px; padding: 0 10px; }
 .row-count + .selection-stats { margin-left: 0; }
+.toolbar .view-select { border: 0; background: rgb(255 255 255 / 70%); border-radius: 14px; padding: 4px 12px; margin-right: 6px; height: 28px; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.toolbar .view-select:hover:not(:disabled) { background: #fff; }
+.toolbar .view-select .dot { color: #e37400; margin-left: 2px; }

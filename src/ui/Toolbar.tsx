@@ -1,5 +1,6 @@
 import { useStore } from "../model/store";
 import { typesOf } from "../model/graph";
+import { ViewSelector } from "./ViewSelector";
 import { addRow, currentSheet, deleteRows, goBack, setColumnType, sortBy, toggleFilters } from "./actions";
 
 const TYPES = [
@@ -64,6 +65,7 @@ export function Toolbar() {
       >
         <svg className="funnel" viewBox="0 0 12 12" aria-hidden><path d="M1 2h10L7 6.5V10L5 11V6.5Z" /></svg>
       </button>
+      <ViewSelector disabled={!sheet} />
       <input id="sheet-filter" className="search" placeholder="Search rows" value={s.filter} disabled={!sheet} onChange={(e) => useStore.setState({ filter: e.target.value })} />
       <div className="spacer" />
       <div className="segmented">

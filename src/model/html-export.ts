@@ -7,7 +7,8 @@ import { columnsOf, displayValue, instancesOf, linkIds, nodeColor, nodeName, typ
 import { shownColumn } from "./formula";
 import { summarize } from "./summary";
 import { toJSON } from "./io";
-import type { Graph, GraphNode } from "./types";
+import { viewTable } from "./views";
+import type { Column, Graph, GraphNode } from "./types";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&${{ "&": "amp", "<": "lt", ">": "gt", '"': "quot" }[c]};`);
 const anchor = (id: string) => `n-${id.replace(/[^\w-]/g, "_")}`;
@@ -25,22 +26,41 @@ function cell(g: Graph, n: GraphNode, colKey: string): string {
   return `<td${shown.type === "number" ? ' class="r"' : ""}>${esc(displayValue(g, shown, value))}</td>`;
 }
 
-function sheet(g: Graph, t: GraphNode): string {
-  const cols = columnsOf(g, t.id).filter((c) => !c.hidden);
-  const rows = instancesOf(g, t.id).sort((a, b) => (a.no ?? 0) - (b.no ?? 0));
+/** One table; only the "All rows" table carries the row anchors that links point to. */
+function table(g: Graph, t: GraphNode, cols: Column[], rows: GraphNode[], anchors: boolean): string {
   const head = `<tr><th class="id">ID</th>${cols.map((c) => `<th${c.key === t.nameKey ? ' class="name"' : ""}>${esc(c.label)}</th>`).join("")}</tr>`;
-  const body = rows.map((n) => `<tr id="${anchor(n.id)}"><td class="id">${n.no ?? ""}</td>${cols.map((c) => cell(g, n, c.key)).join("")}</tr>`).join("\n");
+  const body = rows.map((n) => `<tr${anchors ? ` id="${anchor(n.id)}"` : ""}><td class="id">${n.no ?? ""}</td>${cols.map((c) => cell(g, n, c.key)).join("")}</tr>`).join("\n");
   const foot = cols.some((c) => c.summary)
     ? `<tfoot><tr><td class="id">${rows.length}</td>${cols.map((c) => `<td class="r">${c.summary ? esc(summarize(g, c, rows, c.summary)) : ""}</td>`).join("")}</tr></tfoot>`
     : "";
-  return `<section id="${anchor(t.id)}">
-<h2><i style="background:${esc(t.color)}"></i>${esc(t.label)} <small>${rows.length} ${rows.length === 1 ? "row" : "rows"}</small></h2>
-<div class="scroll"><table>
+  return `<div class="scroll"><table>
 <thead>${head}</thead>
 <tbody>
 ${body}
 </tbody>${foot}
-</table></div>
+</table></div>`;
+}
+
+/**
+ * A sheet: the "All rows" table and, for saved filter views, one precomputed table per view
+ * (rows, columns, order and summaries) with a selector to switch between them.
+ */
+function sheet(g: Graph, t: GraphNode): string {
+  const cols = columnsOf(g, t.id).filter((c) => !c.hidden || t.views?.length);
+  const rows = instancesOf(g, t.id).sort((a, b) => (a.no ?? 0) - (b.no ?? 0));
+  const views = t.views ?? [];
+  const count = (n: number) => `${n} ${n === 1 ? "row" : "rows"}`;
+  const select = views.length
+    ? `<select class="views" aria-label="Filter view"><option value="">All rows</option>${views.map((v) => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join("")}</select>`
+    : "";
+  const viewTables = views.map((v) => {
+    const vt = viewTable(g, t.id, v);
+    return `<div class="view" data-view="${esc(v.id)}" data-count="${esc(count(vt.rows.length))}" hidden>${table(g, t, vt.columns, vt.rows, false)}</div>`;
+  });
+  return `<section id="${anchor(t.id)}">
+<h2><i style="background:${esc(t.color)}"></i>${esc(t.label)} <small>${count(rows.length)}</small>${select}</h2>
+<div class="view" data-view="" data-count="${esc(count(rows.length))}">${table(g, t, cols, rows, true)}</div>
+${viewTables.join("\n")}
 </section>`;
 }
 
@@ -70,6 +90,7 @@ export function toHTML(g: Graph, name: string, appUrl: string): string {
   h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 500; margin: 28px 0 8px; }
   h2 i { width: 12px; height: 12px; border-radius: 3px; }
   h2 small { color: #5f6368; font-weight: 400; font-size: 13px; }
+  h2 .views { margin-left: auto; font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid #c4c7c5; border-radius: 14px; background: #fff; }
   .scroll { overflow-x: auto; background: #fff; border: 1px solid #e1e3e1; border-radius: 8px; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
   th, td { padding: 5px 10px; border-bottom: 1px solid #eceeef; text-align: left; vertical-align: top; white-space: nowrap; }
@@ -83,7 +104,8 @@ export function toHTML(g: Graph, name: string, appUrl: string): string {
   .chip:hover { background: #d3e3fd; }
   .chip i { width: 7px; height: 7px; border-radius: 50%; }
   footer { margin-top: 32px; color: #5f6368; font-size: 12px; }
-  @media print { .open, nav { display: none; } body { background: #fff; } th { position: static; } }
+  .view[hidden] { display: none; }
+  @media print { .open, nav, h2 .views { display: none; } body { background: #fff; } th { position: static; } }
 </style>
 </head>
 <body>
@@ -98,6 +120,23 @@ ${types.map((t) => sheet(g, t)).join("\n")}
 <footer>Made with <a href="${esc(appUrl)}">GridGraph</a> · <a href="https://github.com/zehrer/GridGraph">github.com/zehrer/GridGraph</a></footer>
 <script type="application/json" id="gridgraph-data">${json}</script>
 <script>
+  // Filter views: show the chosen precomputed table of a sheet.
+  function showView(section, id) {
+    section.querySelectorAll(".view").forEach(function (v) { v.hidden = v.getAttribute("data-view") !== id; });
+    var shown = section.querySelector('.view:not([hidden])');
+    section.querySelector("h2 small").textContent = shown ? shown.getAttribute("data-count") : "";
+  }
+  document.querySelectorAll("select.views").forEach(function (sel) {
+    sel.onchange = function () { showView(sel.closest("section"), sel.value); };
+  });
+  // A link to a row that the current view hides switches that sheet back to "All rows".
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a.chip");
+    var row = a && document.getElementById(a.getAttribute("href").slice(1));
+    if (!row || row.offsetParent) return;
+    var section = row.closest("section"), sel = section.querySelector("select.views");
+    if (sel) { sel.value = ""; showView(section, ""); }
+  });
   // Opens GridGraph and hands over the embedded data once it reports that it is ready.
   document.getElementById("open-in-gridgraph").onclick = function () {
     var app = ${JSON.stringify(appUrl)};

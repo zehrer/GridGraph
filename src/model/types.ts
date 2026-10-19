@@ -12,6 +12,19 @@ export interface ColumnFilter {
   condition?: { op: FilterOp; a?: string; b?: string };
 }
 
+/** Sort order of a sheet; key "" sorts by ID. */
+export interface SortOrder { key: string; asc: boolean }
+
+/** A named filter view of a sheet: filters, visible columns in order, and sort. */
+export interface SavedView {
+  id: string;
+  name: string;
+  /** Keys of the visible columns, in display order; other columns are hidden. */
+  columns: string[];
+  filters: Record<string, ColumnFilter>;
+  sort?: SortOrder;
+}
+
 /** Aggregate shown in the sheet footer. */
 export type Summary = "sum" | "avg" | "min" | "max" | "count" | "empty";
 
@@ -53,6 +66,9 @@ export interface GraphNode {
   /** Whether the sheet shows filter buttons, and the active column filters by column key. */
   filterOn?: boolean;
   filters?: Record<string, ColumnFilter>;
+  /** Saved filter views, and the one last applied (to show when it was changed since). */
+  views?: SavedView[];
+  activeView?: string;
   // Instances only:
   /** ID shown in the sheet: running number per type, assigned on creation. */
   no?: number;

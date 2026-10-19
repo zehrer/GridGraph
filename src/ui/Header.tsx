@@ -4,6 +4,7 @@ import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
 import { openDatabase } from "../model/persist";
 import { Settings } from "./Settings";
+import { viewItems } from "./ViewSelector";
 import { About } from "./About";
 import { DATE_FORMATS, NUMBER_FORMATS, displayDate, displayNumber } from "../model/locale";
 import type { Column } from "../model/types";
@@ -130,6 +131,9 @@ export function Header() {
         { label: m.type.filterOn ? "Remove filter" : "Create a filter", shortcut: `⇧${MOD}F`, disabled: !sheet, action: A.toggleFilters },
         { label: "Filter by selected value", disabled: !sheet || sel.row < 1 || sel.col < 1 || !m.rows[sel.row - 1], action: A.filterBySelectedValue },
         { label: "Clear all filters", disabled: !Object.keys(m.type.filters ?? {}).length, action: A.clearFilters },
+        "-",
+        { heading: "Filter views" },
+        ...(sheet ? viewItems() : []),
         "-",
         { label: "Search rows…", shortcut: `${MOD}F`, disabled: !sheet, action: A.focusFilter },
         { label: "Clear search", disabled: !s.filter, action: () => useStore.setState({ filter: "" }) },

@@ -10,6 +10,7 @@ import { rangeOf, useStore, type Cell } from "../model/store";
 import { parseClipboard, toHTML, toTSV, type Matrix } from "../model/clipboard";
 import type { Column, ColumnFilter, Graph, GraphNode, Summary, Value } from "../model/types";
 import { applyFilters, cellKeys, isActive } from "../model/filter";
+import { applyView, captureView, resetView, sortRows } from "../model/views";
 
 export interface SheetModel {
   type: GraphNode;
@@ -40,19 +41,7 @@ export function sheetModel(g: Graph, typeId: string, { sort, filter }: SheetView
   const total = instancesOf(g, typeId);
   // "base": rows after the search box, before column filters (the filter panel lists their values).
   const base = q ? total.filter((n) => [String(n.no), ...all.map((c) => textOf(g, n, c))].some((v) => v.toLowerCase().includes(q))) : total;
-  let rows = applyFilters(g, type, all, base);
-  const col = sort && all.find((c) => c.key === sort.key);
-  const key = (n: GraphNode) => {
-    if (!col) return n.no ?? "";
-    const { col: shown, value } = shownColumn(g, n, col);
-    return (shown.type === "relation" ? rawValue(g, shown, value) : Array.isArray(value) ? value.join(", ") : value) ?? "";
-  };
-  const asc = sort?.asc ?? true;
-  rows = [...rows].sort((a, b) => {
-    const [x, y] = [key(a), key(b)];
-    const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
-    return asc ? c : -c;
-  });
+  const rows = sortRows(g, all, applyFilters(g, type, all, base), sort);
   return { type, columns, all, rows, base, total: total.length };
 }
 
@@ -255,6 +244,55 @@ export function setColumnFilter(key: string, f?: ColumnFilter) {
 }
 
 export const clearFilters = () => editType((t) => void delete t.filters);
+
+// --- Filter views ---
+
+/** Applies a saved view of the active sheet, or "All rows" for null. */
+export function applyViewById(id: string | null) {
+  const { activeTypeId, graph } = useStore.getState();
+  const view = graph.nodes[activeTypeId].views?.find((v) => v.id === id);
+  useStore.getState().edit((g) => (view ? applyView(g, activeTypeId, view) : resetView(g, activeTypeId)));
+  useStore.setState({ sort: view?.sort ?? null });
+}
+
+export function saveViewAs() {
+  const { activeTypeId, graph, sort } = useStore.getState();
+  const t = graph.nodes[activeTypeId];
+  const name = prompt("Name of the new filter view:", `View ${(t.views?.length ?? 0) + 1}`)?.trim();
+  if (!name) return;
+  editType((t) => {
+    const view = captureView(useStore.getState().graph, activeTypeId, name, sort);
+    t.views = [...(t.views ?? []), view];
+    t.activeView = view.id;
+  });
+}
+
+/** Saves the sheet's current state into the active view. */
+export function updateView() {
+  const { activeTypeId, graph, sort } = useStore.getState();
+  const id = graph.nodes[activeTypeId].activeView;
+  if (!id) return;
+  editType((t) => {
+    t.views = (t.views ?? []).map((v) => (v.id === id ? captureView(useStore.getState().graph, activeTypeId, v.name, sort, id) : v));
+  });
+}
+
+export function renameView() {
+  const t = useStore.getState().graph.nodes[useStore.getState().activeTypeId];
+  const view = t.views?.find((v) => v.id === t.activeView);
+  const name = view && prompt("Rename filter view:", view.name)?.trim();
+  if (view && name) editType((t) => (t.views = (t.views ?? []).map((v) => (v.id === view.id ? { ...v, name } : v))));
+}
+
+export function deleteView() {
+  const t = useStore.getState().graph.nodes[useStore.getState().activeTypeId];
+  const view = t.views?.find((v) => v.id === t.activeView);
+  if (!view || !confirm(`Delete the filter view "${view.name}"? The sheet keeps its current filters.`)) return;
+  editType((t) => {
+    t.views = (t.views ?? []).filter((v) => v.id !== view.id);
+    delete t.activeView;
+  });
+}
 
 /** Data → Filter by selected value: shows only rows with the active cell's value in its column. */
 export function filterBySelectedValue() {
