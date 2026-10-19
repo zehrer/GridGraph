@@ -127,6 +127,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | GR-6 | Layout positions are not saved; the layout is recomputed. | Done (decision) |
 | GR-7 | **Hide type nodes** (◆ button): type nodes and `typeOf` edges are left out of drawing and layout, and a legend lists the types with color and count. Remembered per browser. | Done |
 | GR-8 | Clicking a legend entry **hides or shows that type's nodes** (and their edges) in the graph; hidden entries are dimmed. Kept while switching views, reset when another database opens. | Done |
+| GR-9 | **Sheet filters apply to the graph**: rows hidden by their sheet's column filters (and so by the active filter view) are left out of the graph with their edges. A funnel toggle in the graph tools turns this off (on by default, per browser; green while rows are hidden); the legend shows visible/total per type, e.g. "Person 2/3". | Done |
 
 ## 7. Databases, storage and files
 

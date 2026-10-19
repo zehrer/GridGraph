@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../model/store";
 import { addEdge, columnsOf, deleteEdge, deleteNode, displayValue, edgesOf, instancesOf, nodeColor, nodeName, typesOf } from "../model/graph";
 import { showInSheet } from "./actions";
 import { GraphCanvas } from "./graph-canvas";
 import { shownColumn } from "../model/formula";
+import { filteredOut } from "../model/filter";
 
 export function GraphView() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -24,6 +25,7 @@ export function GraphView() {
     canvas.current = c;
     c.setShowTypes(useStore.getState().prefs.graphTypes);
     c.setHiddenTypes(useStore.getState().hiddenTypes);
+    if (useStore.getState().prefs.graphFilters) c.setHiddenNodes(filteredOut(useStore.getState().graph));
     c.setGraph(useStore.getState().graph);
     // Let the layout settle a little, then frame the graph (or the focused node).
     c.fitOnSettle = !focusNodeId;
@@ -34,6 +36,15 @@ export function GraphView() {
   useEffect(() => canvas.current?.setGraph(graph), [graph]);
   useEffect(() => canvas.current?.setShowTypes(showTypes), [showTypes]);
   useEffect(() => canvas.current?.setHiddenTypes(hiddenTypes), [hiddenTypes]);
+  // The sheets' column filters (and so their filter views) also apply to the graph.
+  const filtered = useMemo(() => filteredOut(graph), [graph]);
+  const useFilters = prefs.graphFilters;
+  useEffect(() => canvas.current?.setHiddenNodes(useFilters ? filtered : new Set()), [filtered, useFilters]);
+  const count = (typeId: string) => {
+    const all = instancesOf(graph, typeId);
+    const shown = useFilters ? all.filter((n) => !filtered.has(n.id)).length : all.length;
+    return shown === all.length ? String(all.length) : `${shown}/${all.length}`;
+  };
   const toggleType = (id: string) =>
     useStore.setState({ hiddenTypes: hiddenTypes.includes(id) ? hiddenTypes.filter((t) => t !== id) : [...hiddenTypes, id] });
 
@@ -53,6 +64,13 @@ export function GraphView() {
         <button className={showTypes ? "on" : ""} title={showTypes ? "Hide type nodes (show a legend)" : "Show type nodes"} onClick={() => setPrefs({ graphTypes: !showTypes })}>
           ◆
         </button>
+        <button
+          className={useFilters && filtered.size ? "on filtered" : ""}
+          title={useFilters ? `Sheet filters apply (${filtered.size} ${filtered.size === 1 ? "row" : "rows"} hidden) – click to show all rows` : "Apply the sheets' filters to the graph"}
+          onClick={() => setPrefs({ graphFilters: !useFilters })}
+        >
+          <svg className="funnel" viewBox="0 0 12 12" aria-hidden><path d="M1 2h10L7 6.5V10L5 11V6.5Z" /></svg>
+        </button>
       </div>
       {!showTypes && (
         <div className="graph-legend">
@@ -65,7 +83,7 @@ export function GraphView() {
             >
               <i style={{ background: t.color }} />
               {t.label}
-              <span>{instancesOf(graph, t.id).length}</span>
+              <span>{count(t.id)}</span>
             </button>
           ))}
         </div>

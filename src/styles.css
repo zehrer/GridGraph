@@ -301,3 +301,6 @@ main { flex: 1; min-height: 0; display: flex; }
 .toolbar .view-select { border: 0; background: rgb(255 255 255 / 70%); border-radius: 14px; padding: 4px 12px; margin-right: 6px; height: 28px; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
 .toolbar .view-select:hover:not(:disabled) { background: #fff; }
 .toolbar .view-select .dot { color: #e37400; margin-left: 2px; }
+.graph-tools .funnel { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.2; vertical-align: -2px; }
+.graph-tools button.filtered { background: #ceead6; color: #0d652d; }
+.graph-tools button.filtered .funnel { fill: currentColor; }

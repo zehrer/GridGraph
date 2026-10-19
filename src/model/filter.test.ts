@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { applyFilters, distinctValues, passes } from "./filter";
+import { applyFilters, distinctValues, filteredOut, passes } from "./filter";
 import { columnsOf, instancesOf, nodeName } from "./graph";
 import { setLocale } from "./locale";
 import { sampleGraph } from "./sample";
@@ -46,5 +46,16 @@ describe("column filters", () => {
       { key: "comp_acme", label: "Acme Technologies", count: 2 },
       { key: "comp_nova", label: "Nova Dynamics", count: 1 },
     ]);
+  });
+
+  it("collects the rows hidden by each sheet's filters, for the graph", () => {
+    const h = sampleGraph();
+    h.nodes.type_person.filterOn = true;
+    h.nodes.type_person.filters = { company: { values: ["comp_acme"] } };
+    h.nodes.type_project.filterOn = true;
+    h.nodes.type_project.filters = { status: { condition: { op: "equals", a: "on track" } } };
+    expect([...filteredOut(h)].sort()).toEqual(["person_clara", "proj_alpha"]);
+    h.nodes.type_person.filterOn = false;
+    expect([...filteredOut(h)]).toEqual(["proj_alpha"]);
   });
 });

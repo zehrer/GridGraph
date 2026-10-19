@@ -3,7 +3,7 @@
  * across columns. Values are compared by canonical keys that do not depend on the display
  * notation: numbers as written by JS, dates as ISO, yes/no as true/false, links as node ids.
  */
-import { displayValue, linkIds, nodeName, rawValue } from "./graph";
+import { columnsOf, displayValue, instancesOf, linkIds, nodeName, rawValue, typesOf } from "./graph";
 import { shownColumn } from "./formula";
 import { parseDate, parseNumber } from "./locale";
 import type { Column, ColumnFilter, FilterOp, Graph, GraphNode } from "./types";
@@ -118,4 +118,16 @@ export function distinctValues(g: Graph, col: Column, rows: GraphNode[]): { key:
     numeric ? x.num - y.num : dates ? x.key.localeCompare(y.key) : x.label.localeCompare(y.label, undefined, { numeric: true });
   list.sort((x, y) => (x.key === "" ? -1 : y.key === "" ? 1 : order(x, y)));
   return list.map(({ key, label, count }) => ({ key, label, count }));
+}
+
+/** Rows hidden by their sheet's column filters, across all types (for the graph view). */
+export function filteredOut(g: Graph): Set<string> {
+  const out = new Set<string>();
+  for (const t of typesOf(g)) {
+    if (!t.filterOn || !Object.keys(t.filters ?? {}).length) continue;
+    const rows = instancesOf(g, t.id);
+    const kept = new Set(applyFilters(g, t, columnsOf(g, t.id), rows).map((n) => n.id));
+    for (const n of rows) if (!kept.has(n.id)) out.add(n.id);
+  }
+  return out;
 }

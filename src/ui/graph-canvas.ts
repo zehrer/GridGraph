@@ -24,6 +24,7 @@ export class GraphCanvas {
   private edges: DerivedEdge[] = [];
   private showTypes = true;
   private hiddenTypes = new Set<string>();
+  private hiddenNodes = new Set<string>();
   private pan = { x: 0, y: 0 };
   private zoom = 1;
   private alpha = 1;
@@ -70,7 +71,7 @@ export class GraphCanvas {
   }
 
   private refresh() {
-    const hidden = (n: GraphNode) => this.hiddenTypes.has(n.isType ? n.id : (n.typeId ?? ""));
+    const hidden = (n: GraphNode) => this.hiddenTypes.has(n.isType ? n.id : (n.typeId ?? "")) || this.hiddenNodes.has(n.id);
     this.nodes = Object.values(this.g.nodes).filter((n) => (this.showTypes || !n.isType) && !hidden(n));
     const shown = new Set(this.nodes.map((n) => n.id));
     this.edges = edgesOf(this.g).filter((e) => shown.has(e.source) && shown.has(e.target));
@@ -81,6 +82,14 @@ export class GraphCanvas {
     const next = new Set(ids);
     if (next.size === this.hiddenTypes.size && ids.every((id) => this.hiddenTypes.has(id))) return;
     this.hiddenTypes = next;
+    this.refresh();
+    this.kick();
+  }
+
+  /** Leaves single rows out, e.g. those hidden by their sheet's filters. */
+  setHiddenNodes(ids: Set<string>) {
+    if (ids.size === this.hiddenNodes.size && [...ids].every((id) => this.hiddenNodes.has(id))) return;
+    this.hiddenNodes = new Set(ids);
     this.refresh();
     this.kick();
   }

@@ -21,9 +21,9 @@ export const rangeOf = (a: Cell, b: Cell) => ({
 
 /** Personal display settings, kept per browser (not part of a database). */
 /** `notation` is a locale tag for numbers and dates, "" = the browser's. */
-export interface Prefs { minRows: number; minCols: number; graphTypes: boolean; notation: string; selectionStat: SelectionStat; summaryRow: boolean }
+export interface Prefs { minRows: number; minCols: number; graphTypes: boolean; notation: string; selectionStat: SelectionStat; summaryRow: boolean; graphFilters: boolean }
 const PREFS_KEY = "gridgraph.prefs";
-const DEFAULT_PREFS: Prefs = { minRows: 20, minCols: 5, graphTypes: true, notation: "", selectionStat: "sum", summaryRow: true };
+const DEFAULT_PREFS: Prefs = { minRows: 20, minCols: 5, graphTypes: true, notation: "", selectionStat: "sum", summaryRow: true, graphFilters: true };
 function loadPrefs(): Prefs {
   try {
     return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") };
