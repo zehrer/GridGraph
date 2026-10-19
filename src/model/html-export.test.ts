@@ -29,4 +29,12 @@ describe("HTML export", () => {
   it("rejects HTML that was not exported from GridGraph", () => {
     expect(() => importText("page.html", "<!doctype html><p>hi</p>")).toThrow("not exported from GridGraph");
   });
+
+  it("carries what the live summary row needs, and leaves it out when the summary row is off", () => {
+    expect(html).toContain('data-sum="sum" data-fmt="EUR">Sum €235,000.00</td>');
+    expect(html).toMatch(/<td class="r" data-v data-n="150000">€150,000.00<\/td>/);
+    const off = toHTML(g, "Demo", "https://zehrer.github.io/GridGraph/", { summaryRow: false });
+    expect(off).not.toContain("<tfoot>");
+    expect(off).not.toContain("data-sum=");
+  });
 });

@@ -585,7 +585,8 @@ export const exportGraphML = () => download(toGraphML(useStore.getState().graph)
 const appUrl = () => new URL(import.meta.env.BASE_URL, location.href).href;
 export const exportHTML = () => {
   const { graph, db } = useStore.getState();
-  download(toStandaloneHTML(graph, db.name, appUrl()), fileName("html"), "text/html");
+  const { prefs } = useStore.getState();
+  download(toStandaloneHTML(graph, db.name, appUrl(), { summaryRow: prefs.summaryRow }), fileName("html"), "text/html");
 };
 
 /** Imports a file as a new database named after the file. */

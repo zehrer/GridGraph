@@ -18,6 +18,9 @@ let decimal = ".";
 let dateOrder: ("day" | "month" | "year")[] = ["month", "day", "year"];
 let dateSep = "/";
 
+/** The locale tag numbers and dates are currently written in. */
+export const currentLocale = () => locale;
+
 /** Switches the notation; called once at startup and by tests. */
 export function setLocale(tag: string) {
   locale = tag;

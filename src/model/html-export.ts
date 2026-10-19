@@ -8,36 +8,53 @@ import { shownColumn } from "./formula";
 import { summarize } from "./summary";
 import { isListUnit, quickKeys, quickValues } from "./filter";
 import { toJSON } from "./io";
+import { currentLocale, parseNumber } from "./locale";
 import { viewTable } from "./views";
 import type { Column, Graph, GraphNode, QuickFilter } from "./types";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&${{ "&": "amp", "<": "lt", ">": "gt", '"': "quot" }[c]};`);
 const anchor = (id: string) => `n-${id.replace(/[^\w-]/g, "_")}`;
 
-function cell(g: Graph, n: GraphNode, colKey: string): string {
+/** Data a summary needs from a cell: data-v marks it filled, data-n holds a number, data-d an ISO date. */
+function summaryData(value: unknown, type: string): string {
+  if (value === undefined || value === "") return "";
+  const num = typeof value === "number" ? value : typeof value === "string" && type !== "date" ? parseNumber(value) : undefined;
+  if (num !== undefined) return ` data-v data-n="${num}"`;
+  if (type === "date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return ` data-v data-d="${value}"`;
+  return " data-v";
+}
+
+function cell(g: Graph, n: GraphNode, colKey: string, summary = false): string {
   const col = columnsOf(g, n.typeId!).find((c) => c.key === colKey)!;
   const { col: shown, value, error } = shownColumn(g, n, col);
   if (error) return `<td class="err" title="${esc(error)}">#ERROR</td>`;
   if (value === undefined) return "<td></td>";
+  if (summary) return cellWith(g, shown, value, summaryData(value, shown.type));
+  return cellWith(g, shown, value, "");
+}
+
+function cellWith(g: Graph, shown: Column, value: NonNullable<GraphNode["props"][string]>, attrs: string): string {
   if (shown.type === "relation") {
     const links = linkIds(value).filter((id) => g.nodes[id]);
-    return `<td>${links.map((id) => `<a class="chip" href="#${anchor(id)}"><i style="background:${esc(nodeColor(g, g.nodes[id]))}"></i>${esc(nodeName(g, g.nodes[id]))}</a>`).join(" ")}</td>`;
+    return `<td${attrs}>${links.map((id) => `<a class="chip" href="#${anchor(id)}"><i style="background:${esc(nodeColor(g, g.nodes[id]))}"></i>${esc(nodeName(g, g.nodes[id]))}</a>`).join(" ")}</td>`;
   }
-  if (shown.type === "boolean") return `<td class="c">${value ? "✓" : ""}</td>`;
-  return `<td${shown.type === "number" ? ' class="r"' : ""}>${esc(displayValue(g, shown, value))}</td>`;
+  if (shown.type === "boolean") return `<td class="c"${attrs}>${value ? "✓" : ""}</td>`;
+  return `<td${shown.type === "number" ? ' class="r"' : ""}${attrs}>${esc(displayValue(g, shown, value))}</td>`;
 }
 
 /** One table; only the "All rows" table carries the row anchors that links point to. */
 type Quick = { col: Column; unit: QuickFilter["unit"] };
 
-function table(g: Graph, t: GraphNode, cols: Column[], rows: GraphNode[], anchors: boolean, quicks: Quick[] = []): string {
+function table(g: Graph, t: GraphNode, cols: Column[], rows: GraphNode[], anchors: boolean, quicks: Quick[] = [], summaryRow = true): string {
+  const sums = summaryRow && cols.some((c) => c.summary);
   // Each row carries the values it matches per quick filter column, for the page's quick filter controls.
   const q = (n: GraphNode) =>
     quicks.length ? ` data-q="${esc(JSON.stringify(Object.fromEntries(quicks.map((x) => [x.col.key, quickKeys(g, n, x.col, x.unit)]))))}"` : "";
   const head = `<tr><th class="id">ID</th>${cols.map((c) => `<th${c.key === t.nameKey ? ' class="name"' : ""}>${esc(c.label)}</th>`).join("")}</tr>`;
-  const body = rows.map((n) => `<tr${anchors ? ` id="${anchor(n.id)}"` : ""}${q(n)}><td class="id">${n.no ?? ""}</td>${cols.map((c) => cell(g, n, c.key)).join("")}</tr>`).join("\n");
-  const foot = cols.some((c) => c.summary)
-    ? `<tfoot><tr><td class="id">${rows.length}</td>${cols.map((c) => `<td class="r">${c.summary ? esc(summarize(g, c, rows, c.summary)) : ""}</td>`).join("")}</tr></tfoot>`
+  const body = rows.map((n) => `<tr${anchors ? ` id="${anchor(n.id)}"` : ""}${q(n)}><td class="id">${n.no ?? ""}</td>${cols.map((c) => cell(g, n, c.key, sums && !!c.summary)).join("")}</tr>`).join("\n");
+  // Precomputed for all rows; the page recomputes it for the rows a quick filter leaves.
+  const foot = sums
+    ? `<tfoot><tr><td class="id">${rows.length}</td>${cols.map((c) => `<td class="r"${c.summary ? ` data-sum="${c.summary}" data-fmt="${esc(c.format ?? "")}"` : ""}>${c.summary ? esc(summarize(g, c, rows, c.summary)) : ""}</td>`).join("")}</tr></tfoot>`
     : "";
   return `<div class="scroll"><table>
 <thead>${head}</thead>
@@ -59,7 +76,7 @@ function quickControl(g: Graph, quick: Quick, rows: GraphNode[], value: string, 
  * A sheet: the "All rows" table and, for saved filter views, one precomputed table per view
  * (rows, columns, order and summaries) with a selector to switch between them.
  */
-function sheet(g: Graph, t: GraphNode): string {
+function sheet(g: Graph, t: GraphNode, summaryRow: boolean): string {
   const cols = columnsOf(g, t.id).filter((c) => !c.hidden || t.views?.length);
   const rows = instancesOf(g, t.id).sort((a, b) => (a.no ?? 0) - (b.no ?? 0));
   const views = t.views ?? [];
@@ -80,16 +97,17 @@ function sheet(g: Graph, t: GraphNode): string {
     const vt = viewTable(g, t.id, v);
     // A view saved with quick filters sets those controls when it is chosen.
     const vq = v.quicks?.length ? ` data-quicks="${esc(JSON.stringify(Object.fromEntries(v.quicks.map((q) => [q.key, { value: q.value, on: !q.off }]))))}"` : "";
-    return `<div class="view" data-view="${esc(v.id)}" data-count="${esc(count(vt.rows.length))}"${vq} hidden>${table(g, t, vt.columns, vt.rows, false, quicks)}</div>`;
+    return `<div class="view" data-view="${esc(v.id)}" data-count="${esc(count(vt.rows.length))}"${vq} hidden>${table(g, t, vt.columns, vt.rows, false, quicks, summaryRow)}</div>`;
   });
   return `<section id="${anchor(t.id)}">
 <h2><i style="background:${esc(t.color)}"></i>${esc(t.label)} <small>${count(rows.length)}</small>${control}${select}</h2>
-<div class="view" data-view="" data-count="${esc(count(rows.length))}">${table(g, t, cols, rows, true, quicks)}</div>
+<div class="view" data-view="" data-count="${esc(count(rows.length))}">${table(g, t, cols, rows, true, quicks, summaryRow)}</div>
 ${viewTables.join("\n")}
 </section>`;
 }
 
-export function toHTML(g: Graph, name: string, appUrl: string): string {
+/** `summaryRow` follows View → Summary row in the app. */
+export function toHTML(g: Graph, name: string, appUrl: string, { summaryRow = true }: { summaryRow?: boolean } = {}): string {
   // Hidden sheets (lookup tables) are left out of the navigation and come last, so links to them still work.
   const types = [...typesOf(g).filter((t) => !t.hiddenSheet), ...typesOf(g).filter((t) => t.hiddenSheet)];
   const date = new Date().toLocaleString();
@@ -155,7 +173,7 @@ export function toHTML(g: Graph, name: string, appUrl: string): string {
   <button id="open-in-gridgraph" type="button">Open in GridGraph</button>
 </div>
 <nav>${types.filter((t) => !t.hiddenSheet).map((t) => `<a href="#${anchor(t.id)}">${esc(t.label)}</a>`).join("")}</nav>
-${types.map((t) => sheet(g, t)).join("\n")}
+${types.map((t) => sheet(g, t, summaryRow)).join("\n")}
 <footer>Made with <a href="${esc(appUrl)}">GridGraph</a> · <a href="https://github.com/zehrer/GridGraph">github.com/zehrer/GridGraph</a></footer>
 <script type="application/json" id="gridgraph-data">${json}</script>
 <script>
@@ -170,6 +188,43 @@ ${types.map((t) => sheet(g, t)).join("\n")}
       if (q) { qf.querySelector("select").value = q.value; qf.querySelector("input").checked = q.on; }
     });
     applyQuick(section);
+  }
+  // Summary row over the visible rows, written like in the app (locale and column format).
+  var LOCALE = ${JSON.stringify(currentLocale())};
+  var SUMS = { sum: "Sum", avg: "Average", min: "Min", max: "Max", count: "Count", empty: "Empty" };
+  function formatNumber(n, fmt) {
+    var o = fmt === "plain" ? { useGrouping: false, maximumFractionDigits: 10 }
+      : fmt === "integer" ? { maximumFractionDigits: 0 }
+      : fmt === "decimal2" ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+      : fmt === "EUR" || fmt === "USD" ? { style: "currency", currency: fmt }
+      : fmt === "percent" ? { style: "percent", maximumFractionDigits: 2 } : {};
+    return n.toLocaleString(LOCALE, o);
+  }
+  function recomputeSummary(v) {
+    var foot = v.querySelector("tfoot tr");
+    if (!foot) return;
+    var rows = [].filter.call(v.querySelectorAll("tbody tr"), function (tr) { return !tr.hidden; });
+    foot.cells[0].textContent = rows.length;
+    [].forEach.call(foot.cells, function (td, i) {
+      var kind = td.getAttribute("data-sum");
+      if (!kind) return;
+      var cells = rows.map(function (tr) { return tr.cells[i]; });
+      var filled = cells.filter(function (c) { return c && c.hasAttribute("data-v"); });
+      var label = SUMS[kind];
+      if (kind === "count") { td.textContent = label + " " + filled.length; return; }
+      if (kind === "empty") { td.textContent = label + " " + (cells.length - filled.length); return; }
+      var dates = filled.filter(function (c) { return c.hasAttribute("data-d"); });
+      if ((kind === "min" || kind === "max") && dates.length && dates.length === filled.length) {
+        dates.sort(function (a, b) { return a.getAttribute("data-d").localeCompare(b.getAttribute("data-d")); });
+        td.textContent = label + " " + (kind === "min" ? dates[0] : dates[dates.length - 1]).textContent;
+        return;
+      }
+      var nums = filled.filter(function (c) { return c.hasAttribute("data-n"); }).map(function (c) { return Number(c.getAttribute("data-n")); });
+      if (!nums.length) { td.textContent = label; return; }
+      var sum = nums.reduce(function (a, b) { return a + b; }, 0);
+      var value = { sum: sum, avg: sum / nums.length, min: Math.min.apply(null, nums), max: Math.max.apply(null, nums) }[kind];
+      td.textContent = label + " " + formatNumber(Math.round(value * 10000) / 10000, td.getAttribute("data-fmt"));
+    });
   }
   // Quick filters: a row stays when it matches every switched-on control; precomputed summaries are hidden meanwhile.
   function applyQuick(section) {
@@ -188,8 +243,7 @@ ${types.map((t) => sheet(g, t)).join("\n")}
         tr.hidden = !show;
         if (show) n++;
       });
-      var foot = v.querySelector("tfoot");
-      if (foot) foot.hidden = on;
+      recomputeSummary(v);
       v.setAttribute("data-shown", n + (n === 1 ? " row" : " rows"));
     });
     var shown = section.querySelector(".view:not([hidden])");
