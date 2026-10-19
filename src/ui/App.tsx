@@ -6,6 +6,7 @@ import { Header } from "./Header";
 import { Sheet } from "./Sheet";
 import { SheetTabs } from "./SheetTabs";
 import { FormulaEditor } from "./FormulaEditor";
+import { CsvImport } from "./CsvImport";
 import { Toolbar } from "./Toolbar";
 
 export function App() {
@@ -40,6 +41,7 @@ export function App() {
       <main>{view === "sheet" ? <Sheet key={notation} /> : <GraphView />}</main>
       <SheetTabs />
       <FormulaEditor />
+      <CsvImport />
     </div>
   );
 }

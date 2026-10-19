@@ -143,6 +143,9 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | DB-11 | Data saved by version 0.2 (single database) is migrated on first start. | Done |
 | DB-13 | **Export as HTML**: one self-contained file that shows every sheet as a table in any browser without GridGraph or internet – IDs, column order, display formats, formula results, summary rows; link cells are anchors to the linked row. Printable. | Done |
 | DB-14 | The HTML export has a box with a link to GridGraph and an **Open in GridGraph** button: it opens the app in a new tab and hands over the embedded database by `postMessage` (not via a server or the URL); the app asks before opening it as a new database. Fallback: File → Import accepts the HTML file, which embeds the full database as JSON. | Done |
+| DB-15 | **Import CSV / TSV** (File menu, or any .csv/.tsv/.txt via File → Import) as a **new sheet** of the open database, named after the file. A preview dialog shows rows, columns, separator and encoding; the separator can be changed, and "First row contains the column names" is on by default. | Done |
+| DB-16 | The CSV import is fault-tolerant: detects the separator (comma, semicolon, tab, pipe) from the most consistent column count; quoted cells with `""` and line breaks; CRLF/LF/CR; UTF-8 with or without BOM, falling back to Windows-1252 (Excel); skips empty lines; pads short rows and names extra columns; empty or repeated headings get unique names; an unclosed quote does not swallow the file. Column types are guessed (number incl. decimal comma, date incl. DD.MM.YYYY, yes/no), the first column becomes the name column, and an "ID" column of unique whole numbers is kept as the row IDs. | Done |
+| DB-17 | Export as CSV. | Planned |
 | DB-12 | Save to / open from a local file (File System Access API) in addition to browser storage. | Idea |
 
 ## 8. Non-functional

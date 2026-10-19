@@ -56,6 +56,8 @@ interface State {
   focusNodeId: string | null;
   /** Types whose nodes the graph leaves out (toggled in the legend; kept for the session). */
   hiddenTypes: string[];
+  /** A CSV/TSV file waiting in the import dialog. */
+  csvImport: { fileName: string; text: string; encoding: string } | null;
   /** Key of the column whose formula is being edited (active sheet). */
   formulaEditor: string | null;
   /** Where "Back" returns to after following a link. */
@@ -113,6 +115,7 @@ export const useStore = create<State>()((set, get) => {
     focusNodeId: null,
     back: null,
     formulaEditor: null,
+    csvImport: null,
     hiddenTypes: [],
     sort: null,
     filter: "",

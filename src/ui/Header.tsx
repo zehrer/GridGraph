@@ -63,7 +63,8 @@ export function Header() {
       label: "File",
       items: [
         { label: "New database", action: A.newDatabase },
-        { label: "Import (JSON, GraphML, HTML)…", shortcut: `${MOD}O`, action: A.importFile },
+        { label: "Import (JSON, GraphML, HTML, CSV)…", shortcut: `${MOD}O`, action: () => A.importFile() },
+        { label: "Import CSV / TSV as sheet…", action: A.importCSV },
         { label: "Open sample data", action: A.loadSample },
         "-",
         { label: "Export as JSON", action: A.exportJSON },

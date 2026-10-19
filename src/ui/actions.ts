@@ -3,6 +3,7 @@ import { guessDateFormat, parseNumber } from "../model/locale";
 import { cellValue, renameReference, shownColumn } from "../model/formula";
 import { download, importText, toGraphML, toJSON } from "../model/io";
 import { toHTML as toStandaloneHTML } from "../model/html-export";
+import { decodeText } from "../model/csv";
 import { sampleGraph } from "../model/sample";
 import { deleteDatabase, openNew } from "../model/persist";
 import { rangeOf, useStore, type Cell } from "../model/store";
@@ -414,21 +415,34 @@ export const exportHTML = () => {
 };
 
 /** Imports a file as a new database named after the file. */
-export function importFile() {
+const TABLE_FILE = /\.(csv|tsv|tab|txt)$/i;
+
+/**
+ * File → Import: JSON, GraphML or HTML exports open as a new database; CSV/TSV files go to the
+ * CSV dialog and become a new sheet of the open database.
+ */
+export function importFile(accept = ".json,.xml,.graphml,.html,.htm,.csv,.tsv,.tab,.txt") {
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".json,.xml,.graphml,.html,.htm";
+  input.accept = accept;
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
     try {
-      await openNew(importText(file.name, await file.text()), file.name.replace(/\.[^.]+$/, ""));
+      if (TABLE_FILE.test(file.name) || file.type === "text/csv") {
+        const { text, encoding } = decodeText(await file.arrayBuffer());
+        useStore.setState({ csvImport: { fileName: file.name, text, encoding } });
+      } else {
+        await openNew(importText(file.name, await file.text()), file.name.replace(/\.[^.]+$/, ""));
+      }
     } catch (e) {
       alert(`Import failed: ${(e as Error).message}`);
     }
   };
   input.click();
 }
+
+export const importCSV = () => importFile(".csv,.tsv,.tab,.txt,text/csv,text/tab-separated-values");
 
 export const newDatabase = () => openNew(emptyGraph());
 export const loadSample = () => openNew(sampleGraph(), "Sample data");

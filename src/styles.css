@@ -244,3 +244,12 @@ main { flex: 1; min-height: 0; display: flex; }
 .dialog.formula .preview { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
 .dialog.formula .preview td { padding: 3px 6px; border-bottom: 1px solid #f1f3f4; }
 .dialog.formula .preview td:last-child { text-align: right; font-weight: 500; }
+.dialog.csv { width: min(720px, calc(100vw - 32px)); }
+.dialog input.wide { width: 260px; text-align: left; }
+.dialog label.check { justify-content: flex-start; gap: 8px; }
+.dialog label.check input { width: auto; }
+.dialog .preview-scroll { max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; margin-top: 8px; }
+.dialog .preview { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dialog .preview th { position: sticky; top: 0; background: var(--head); font-weight: 500; text-align: left; }
+.dialog .preview th, .dialog .preview td { padding: 3px 8px; border-bottom: 1px solid #f1f3f4; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.dialog .preview td.r { text-align: right; }
