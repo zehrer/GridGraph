@@ -6,7 +6,8 @@ import { nodeName } from "../model/graph";
 import { filteredOut, periodLabel, stepPeriod } from "../model/filter";
 import { setLocale } from "../model/locale";
 import leMonde from "../model/samples/le-monde-100-books.json";
-import { applyViewById, quickChoices, setQuickValue, clearQuickFilter, currentSheet, saveViewAs, startQuickFilter, stepQuickFilter, toggleQuickUnit } from "./actions";
+import { toHTML } from "../model/html-export";
+import { applyViewById, toggleQuickFilter, quickChoices, setQuickValue, clearQuickFilter, currentSheet, saveViewAs, startQuickFilter, stepQuickFilter, toggleQuickUnit } from "./actions";
 
 const names = () => currentSheet().rows.map((n) => nodeName(useStore.getState().graph, n));
 const col = (label: string) => currentSheet().columns.findIndex((c) => c.label === label) + 1;
@@ -89,5 +90,28 @@ describe("quick filter", () => {
     const first = quickChoices()[0];
     expect(currentSheet().type.quickFilter?.value).toBe(first.label);
     expect(currentSheet().rows).toHaveLength(first.count);
+  });
+
+  it("switches off and on without losing column and value", () => {
+    useStore.getState().open(sampleGraph(), newDbInfo());
+    useStore.getState().setActiveType("type_project");
+    startQuickFilter(col("Deadline"), "year");
+    toggleQuickFilter();
+    expect(currentSheet().type.quickFilter).toMatchObject({ value: "2027", off: true });
+    expect(names()).toHaveLength(2);
+    toggleQuickFilter();
+    expect(currentSheet().type.quickFilter?.off).toBeUndefined();
+    expect(names()).toEqual(["Cloud Portal"]);
+  });
+
+  it("the HTML export gets a quick filter control and row values", () => {
+    useStore.getState().open(fromJSON(JSON.stringify(leMonde)), newDbInfo());
+    startQuickFilter(col("Genre"), "text");
+    const html = toHTML(useStore.getState().graph, "Le Monde", "https://zehrer.github.io/GridGraph/");
+    const control = html.slice(html.indexOf('<span class="qf'), html.indexOf("</select>"));
+    expect(control).toContain('<input type="checkbox" checked>');
+    expect(control).toContain(">Genre</span>");
+    expect(control).toMatch(/<option value="Novel"[^>]*>Novel \(\d+\)<\/option>/);
+    expect(html).toContain('data-q="[&quot;Novel&quot;]"');
   });
 });

@@ -17,7 +17,13 @@ export interface ColumnFilter {
  * `value` is "2026" (year), "2026-05" (month), a number (number columns), a node id (link
  * columns: rows linking to it) or a text (text columns).
  */
-export interface QuickFilter { key: string; unit: "year" | "month" | "number" | "link" | "text"; value: string }
+export interface QuickFilter {
+  key: string;
+  unit: "year" | "month" | "number" | "link" | "text";
+  value: string;
+  /** Switched off: shows all rows but keeps column and value for switching back on. */
+  off?: boolean;
+}
 
 /** Sort order of a sheet; key "" sorts by ID. */
 export interface SortOrder { key: string; asc: boolean }

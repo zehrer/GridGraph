@@ -98,7 +98,7 @@ export const isActive = (f?: ColumnFilter) => !!f && (!!f.values || !!f.conditio
 export function applyFilters(g: Graph, type: GraphNode, columns: Column[], rows: GraphNode[], exceptKey?: string): GraphNode[] {
   const qf = type.quickFilter;
   const qcol = qf && qf.key !== exceptKey ? columns.find((c) => c.key === qf.key) : undefined;
-  if (qf && qcol) rows = rows.filter((n) => quickKeys(g, n, qcol, qf.unit).includes(qf.value));
+  if (qf && qcol && !qf.off) rows = rows.filter((n) => quickKeys(g, n, qcol, qf.unit).includes(qf.value));
   if (!type.filterOn || !type.filters) return rows;
   const active = columns.filter((c) => c.key !== exceptKey && isActive(type.filters![c.key]));
   return active.length ? rows.filter((n) => active.every((c) => passes(g, n, c, type.filters![c.key]))) : rows;

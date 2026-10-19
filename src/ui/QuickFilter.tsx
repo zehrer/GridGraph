@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../model/store";
 import { isListUnit, quickLabel } from "../model/filter";
-import { clearQuickFilter, currentSheet, quickChoices, setQuickValue, stepQuickFilter, toggleQuickUnit } from "./actions";
+import { clearQuickFilter, currentSheet, quickChoices, setQuickValue, stepQuickFilter, toggleQuickFilter, toggleQuickUnit } from "./actions";
 import { MenuList } from "./Menu";
 
 /**
@@ -24,7 +24,11 @@ export function QuickFilterChip() {
   const label = quickLabel(graph, qf.unit, qf.value);
 
   return (
-    <div className="quick-filter" title={`Quick filter on ${col.label}: ${m.rows.length} of ${m.total} rows`}>
+    <div className={`quick-filter${qf.off ? " off" : ""}`} title={qf.off ? `Quick filter on ${col.label} is off` : `Quick filter on ${col.label}: ${m.rows.length} of ${m.total} rows`}>
+      <label className="switch" title={qf.off ? "Switch the quick filter on" : "Switch the quick filter off (show all rows)"}>
+        <input type="checkbox" checked={!qf.off} onChange={toggleQuickFilter} />
+        <i />
+      </label>
       <span className="col">{col.label}</span>
       <button title="Previous" disabled={listed && at <= 0} onClick={() => stepQuickFilter(-1)}>‹</button>
       <button

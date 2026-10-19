@@ -6,9 +6,10 @@
 import { columnsOf, displayValue, instancesOf, linkIds, nodeColor, nodeName, typesOf } from "./graph";
 import { shownColumn } from "./formula";
 import { summarize } from "./summary";
+import { isListUnit, quickKeys, quickValues } from "./filter";
 import { toJSON } from "./io";
 import { viewTable } from "./views";
-import type { Column, Graph, GraphNode } from "./types";
+import type { Column, Graph, GraphNode, QuickFilter } from "./types";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&${{ "&": "amp", "<": "lt", ">": "gt", '"': "quot" }[c]};`);
 const anchor = (id: string) => `n-${id.replace(/[^\w-]/g, "_")}`;
@@ -27,9 +28,13 @@ function cell(g: Graph, n: GraphNode, colKey: string): string {
 }
 
 /** One table; only the "All rows" table carries the row anchors that links point to. */
-function table(g: Graph, t: GraphNode, cols: Column[], rows: GraphNode[], anchors: boolean): string {
+type Quick = { col: Column; unit: QuickFilter["unit"] };
+
+function table(g: Graph, t: GraphNode, cols: Column[], rows: GraphNode[], anchors: boolean, quick?: Quick): string {
+  // Each row carries the quick filter values it matches, for the page's quick filter control.
+  const q = (n: GraphNode) => (quick ? ` data-q="${esc(JSON.stringify(quickKeys(g, n, quick.col, quick.unit)))}"` : "");
   const head = `<tr><th class="id">ID</th>${cols.map((c) => `<th${c.key === t.nameKey ? ' class="name"' : ""}>${esc(c.label)}</th>`).join("")}</tr>`;
-  const body = rows.map((n) => `<tr${anchors ? ` id="${anchor(n.id)}"` : ""}><td class="id">${n.no ?? ""}</td>${cols.map((c) => cell(g, n, c.key)).join("")}</tr>`).join("\n");
+  const body = rows.map((n) => `<tr${anchors ? ` id="${anchor(n.id)}"` : ""}${q(n)}><td class="id">${n.no ?? ""}</td>${cols.map((c) => cell(g, n, c.key)).join("")}</tr>`).join("\n");
   const foot = cols.some((c) => c.summary)
     ? `<tfoot><tr><td class="id">${rows.length}</td>${cols.map((c) => `<td class="r">${c.summary ? esc(summarize(g, c, rows, c.summary)) : ""}</td>`).join("")}</tr></tfoot>`
     : "";
@@ -39,6 +44,14 @@ function table(g: Graph, t: GraphNode, cols: Column[], rows: GraphNode[], anchor
 ${body}
 </tbody>${foot}
 </table></div>`;
+}
+
+/** Quick filter control: on/off switch, ‹ ›, and the values that occur (in order) with counts. */
+function quickControl(g: Graph, quick: Quick, rows: GraphNode[], value: string, on: boolean): string {
+  const values = quickValues(g, quick.col, rows, quick.unit);
+  if (!isListUnit(quick.unit)) values.sort((a, b) => (quick.unit === "number" ? Number(a.value) - Number(b.value) : a.value.localeCompare(b.value)));
+  const options = values.map((v) => `<option value="${esc(v.value)}"${v.value === value ? " selected" : ""}>${esc(v.label)} (${v.count})</option>`).join("");
+  return `<span class="qf${on ? "" : " off"}"><label class="sw" title="Quick filter on/off"><input type="checkbox"${on ? " checked" : ""}><i></i></label><span class="qcol">${esc(quick.col.label)}</span><button type="button" data-step="-1" title="Previous">‹</button><select aria-label="Quick filter value">${options}</select><button type="button" data-step="1" title="Next">›</button></span>`;
 }
 
 /**
@@ -53,13 +66,19 @@ function sheet(g: Graph, t: GraphNode): string {
   const select = views.length
     ? `<select class="views" aria-label="Filter view"><option value="">All rows</option>${views.map((v) => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join("")}</select>`
     : "";
+  // The sheet's quick filter (or the first one saved in a view) becomes an interactive control.
+  const qf = t.quickFilter ?? views.find((v) => v.quick)?.quick;
+  const qcol = qf && columnsOf(g, t.id).find((c) => c.key === qf.key);
+  const quick = qf && qcol ? { col: qcol, unit: qf.unit } : undefined;
+  const control = quick && qf ? quickControl(g, quick, rows, qf.value, !qf.off) : "";
   const viewTables = views.map((v) => {
     const vt = viewTable(g, t.id, v);
-    return `<div class="view" data-view="${esc(v.id)}" data-count="${esc(count(vt.rows.length))}" hidden>${table(g, t, vt.columns, vt.rows, false)}</div>`;
+    const vq = v.quick && v.quick.key === qf?.key ? ` data-q-value="${esc(v.quick.value)}" data-q-on="${v.quick.off ? "0" : "1"}"` : "";
+    return `<div class="view" data-view="${esc(v.id)}" data-count="${esc(count(vt.rows.length))}"${vq} hidden>${table(g, t, vt.columns, vt.rows, false, quick)}</div>`;
   });
   return `<section id="${anchor(t.id)}">
-<h2><i style="background:${esc(t.color)}"></i>${esc(t.label)} <small>${count(rows.length)}</small>${select}</h2>
-<div class="view" data-view="" data-count="${esc(count(rows.length))}">${table(g, t, cols, rows, true)}</div>
+<h2><i style="background:${esc(t.color)}"></i>${esc(t.label)} <small>${count(rows.length)}</small>${control}${select}</h2>
+<div class="view" data-view="" data-count="${esc(count(rows.length))}">${table(g, t, cols, rows, true, quick)}</div>
 ${viewTables.join("\n")}
 </section>`;
 }
@@ -91,6 +110,18 @@ export function toHTML(g: Graph, name: string, appUrl: string): string {
   h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 500; margin: 28px 0 8px; }
   h2 i { width: 12px; height: 12px; border-radius: 3px; }
   h2 small { color: #5f6368; font-weight: 400; font-size: 13px; }
+  h2 .qf { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 8px; border-radius: 14px; background: #ceead6; color: #0d652d; font-size: 13px; font-weight: 400; }
+  h2 .qf.off { background: #e8eaed; color: #5f6368; }
+  h2 .qf .qcol { margin: 0 2px 0 4px; }
+  h2 .qf button { border: 0; background: none; color: inherit; font: inherit; font-size: 15px; padding: 0 6px; cursor: pointer; border-radius: 10px; }
+  h2 .qf select { border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; max-width: 220px; }
+  h2 .qf .sw { position: relative; display: inline-flex; width: 26px; height: 14px; cursor: pointer; }
+  h2 .qf .sw input { position: absolute; opacity: 0; }
+  h2 .qf .sw i { width: 26px; height: 14px; border-radius: 7px; background: #9aa0a6; }
+  h2 .qf .sw i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+  h2 .qf .sw input:checked + i { background: #188038; }
+  h2 .qf .sw input:checked + i::after { left: 14px; }
+  h2 .qf + .views { margin-left: 8px; }
   h2 .views { margin-left: auto; font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid #c4c7c5; border-radius: 14px; background: #fff; }
   .scroll { overflow-x: auto; background: #fff; border: 1px solid #e1e3e1; border-radius: 8px; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -106,7 +137,7 @@ export function toHTML(g: Graph, name: string, appUrl: string): string {
   .chip i { width: 7px; height: 7px; border-radius: 50%; }
   footer { margin-top: 32px; color: #5f6368; font-size: 12px; }
   .view[hidden] { display: none; }
-  @media print { .open, nav, h2 .views { display: none; } body { background: #fff; } th { position: static; } }
+  @media print { .open, nav, h2 .views, h2 .qf { display: none; } body { background: #fff; } th { position: static; } }
 </style>
 </head>
 <body>
@@ -124,9 +155,45 @@ ${types.map((t) => sheet(g, t)).join("\n")}
   // Filter views: show the chosen precomputed table of a sheet.
   function showView(section, id) {
     section.querySelectorAll(".view").forEach(function (v) { v.hidden = v.getAttribute("data-view") !== id; });
-    var shown = section.querySelector('.view:not([hidden])');
-    section.querySelector("h2 small").textContent = shown ? shown.getAttribute("data-count") : "";
+    var shown = section.querySelector(".view:not([hidden])"), qf = section.querySelector(".qf");
+    // A view saved with a quick filter brings its value along.
+    if (qf && shown && shown.hasAttribute("data-q-value")) {
+      qf.querySelector("select").value = shown.getAttribute("data-q-value");
+      qf.querySelector("input").checked = shown.getAttribute("data-q-on") === "1";
+    }
+    applyQuick(section);
   }
+  // Quick filter: hide rows whose values do not include the chosen one; precomputed summaries are hidden meanwhile.
+  function applyQuick(section) {
+    var qf = section.querySelector(".qf");
+    var on = qf ? qf.querySelector("input").checked : false, value = qf ? qf.querySelector("select").value : "";
+    if (qf) qf.classList.toggle("off", !on);
+    section.querySelectorAll(".view").forEach(function (v) {
+      var n = 0;
+      v.querySelectorAll("tbody tr").forEach(function (tr) {
+        var show = !on || JSON.parse(tr.getAttribute("data-q") || "[]").indexOf(value) >= 0;
+        tr.hidden = !show;
+        if (show) n++;
+      });
+      var foot = v.querySelector("tfoot");
+      if (foot) foot.hidden = on;
+      v.setAttribute("data-shown", n + (n === 1 ? " row" : " rows"));
+    });
+    var shown = section.querySelector(".view:not([hidden])");
+    section.querySelector("h2 small").textContent = shown ? shown.getAttribute("data-shown") : "";
+  }
+  document.querySelectorAll(".qf").forEach(function (qf) {
+    var section = qf.closest("section"), sel = qf.querySelector("select"), box = qf.querySelector("input");
+    box.onchange = sel.onchange = function () { applyQuick(section); };
+    qf.querySelectorAll("button[data-step]").forEach(function (b) {
+      b.onclick = function () {
+        sel.selectedIndex = Math.max(0, Math.min(sel.options.length - 1, sel.selectedIndex + Number(b.getAttribute("data-step"))));
+        box.checked = true;
+        applyQuick(section);
+      };
+    });
+    applyQuick(section);
+  });
   document.querySelectorAll("select.views").forEach(function (sel) {
     sel.onchange = function () { showView(sel.closest("section"), sel.value); };
   });
@@ -137,6 +204,8 @@ ${types.map((t) => sheet(g, t)).join("\n")}
     if (!row || row.offsetParent) return;
     var section = row.closest("section"), sel = section.querySelector("select.views");
     if (sel) { sel.value = ""; showView(section, ""); }
+    // Still hidden by the quick filter: switch it off.
+    if (!row.offsetParent && section.querySelector(".qf")) { section.querySelector(".qf input").checked = false; applyQuick(section); }
   });
   // Opens GridGraph and hands over the embedded data once it reports that it is ready.
   document.getElementById("open-in-gridgraph").onclick = function () {

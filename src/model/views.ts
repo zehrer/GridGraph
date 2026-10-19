@@ -73,7 +73,8 @@ export function viewModified(g: Graph, typeId: string, sort: SortOrder | null): 
 /** Columns and rows a view shows, for the HTML export. */
 export function viewTable(g: Graph, typeId: string, view: SavedView): { columns: Column[]; rows: GraphNode[] } {
   const all = columnsOf(g, typeId);
-  const t = { ...g.nodes[typeId], filterOn: true, filters: view.filters, quickFilter: view.quick };
+  // The HTML export applies quick filters interactively, so view tables are computed without them.
+  const t = { ...g.nodes[typeId], filterOn: true, filters: view.filters, quickFilter: undefined };
   const rows = sortRows(g, all, applyFilters(g, t, all, instancesOf(g, typeId)), view.sort);
   return { columns: view.columns.map((k) => all.find((c) => c.key === k)).filter((c): c is Column => !!c), rows };
 }

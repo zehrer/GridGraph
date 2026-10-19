@@ -280,12 +280,13 @@ export function stepQuickFilter(delta: number) {
     if (!next) return;
     value = next.value;
   }
-  editType((t) => (t.quickFilter = { ...qf, value }));
+  // Choosing a value switches the quick filter on again.
+  editType((t) => (t.quickFilter = { key: qf.key, unit: qf.unit, value }));
 }
 
 export function setQuickValue(value: string) {
   const qf = currentSheet().type.quickFilter;
-  if (qf) editType((t) => (t.quickFilter = { ...qf, value }));
+  if (qf) editType((t) => (t.quickFilter = { key: qf.key, unit: qf.unit, value }));
 }
 
 /** Switches a date quick filter between year and month, staying in the same year. */
@@ -303,6 +304,12 @@ export function toggleQuickUnit() {
 }
 
 export const clearQuickFilter = () => editType((t) => void delete t.quickFilter);
+
+/** Switches the quick filter off (all rows) or on again, keeping its column and value. */
+export function toggleQuickFilter() {
+  const qf = currentSheet().type.quickFilter;
+  if (qf) editType((t) => (t.quickFilter = qf.off ? { key: qf.key, unit: qf.unit, value: qf.value } : { ...qf, off: true }));
+}
 
 // --- Filter views ---
 
