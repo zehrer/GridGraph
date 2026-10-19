@@ -13,10 +13,11 @@ export interface ColumnFilter {
 }
 
 /**
- * Toolbar quick filter: shows the rows whose value in a column falls into one period, browsable
- * with ‹ ›. `value` is "2026" (year), "2026-05" (month) or a number (number columns).
+ * Toolbar quick filter: shows the rows whose value in a column matches, browsable with ‹ ›.
+ * `value` is "2026" (year), "2026-05" (month), a number (number columns), a node id (link
+ * columns: rows linking to it) or a text (text columns).
  */
-export interface QuickFilter { key: string; unit: "year" | "month" | "number"; value: string }
+export interface QuickFilter { key: string; unit: "year" | "month" | "number" | "link" | "text"; value: string }
 
 /** Sort order of a sheet; key "" sorts by ID. */
 export interface SortOrder { key: string; asc: boolean }

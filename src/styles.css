@@ -314,3 +314,5 @@ main { flex: 1; min-height: 0; display: flex; }
 .quick-filter .clear { font-size: 11px; }
 .filter-panel ul.sub { border: 0; max-height: none; min-height: 0; padding: 0; overflow: visible; }
 .filter-panel .twisty { border: 0; background: none; width: 16px; padding: 0; color: var(--muted); font-size: 11px; }
+.menu { max-height: 70vh; overflow-y: auto; }
+.quick-filter .period { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }

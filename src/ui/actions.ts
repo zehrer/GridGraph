@@ -9,7 +9,7 @@ import { deleteDatabase, openNew } from "../model/persist";
 import { rangeOf, useStore, type Cell } from "../model/store";
 import { parseClipboard, toHTML, toTSV, type Matrix } from "../model/clipboard";
 import type { Column, ColumnFilter, Graph, GraphNode, QuickFilter, Summary, Value } from "../model/types";
-import { applyFilters, cellKeys, isActive, periodOf, periodsOf, stepPeriod } from "../model/filter";
+import { applyFilters, cellKeys, isActive, isListUnit, periodOf, periodsOf, quickValues, stepPeriod } from "../model/filter";
 import { applyView, captureView, resetView, sortRows } from "../model/views";
 
 export interface SheetModel {
@@ -254,14 +254,38 @@ export function startQuickFilter(col: number, unit: QuickFilter["unit"]) {
   const c = m.columns[col - 1];
   if (!c) return;
   const node = sel.col === col ? m.rows[sel.row - 1] : undefined;
-  const value = (node && periodOf(graph, node, c, unit)) ?? periodsOf(graph, c, m.base, unit)[0];
-  if (!value) return alert(`"${c.label}" has no ${unit === "number" ? "numbers" : "dates"} to filter by.`);
+  const first = isListUnit(unit) ? quickValues(graph, c, m.base, unit)[0]?.value : periodsOf(graph, c, m.base, unit)[0];
+  const value = (node && periodOf(graph, node, c, unit)) ?? first;
+  if (!value) return alert(`"${c.label}" has no values to filter by.`);
   editType((t) => (t.quickFilter = { key: c.key, unit, value }));
 }
 
+/** Values a list quick filter steps through: those left by the other filters. */
+export function quickChoices() {
+  const { graph } = useStore.getState();
+  const m = currentSheet();
+  const qf = m.type.quickFilter;
+  const c = qf && m.all.find((x) => x.key === qf.key);
+  return qf && c ? quickValues(graph, c, applyFilters(graph, m.type, m.all, m.base, qf.key), qf.unit) : [];
+}
+
+/** ‹ ›: dates and numbers step like a calendar; links and texts move to the previous/next existing value. */
 export function stepQuickFilter(delta: number) {
   const qf = currentSheet().type.quickFilter;
-  if (qf) editType((t) => (t.quickFilter = { ...qf, value: stepPeriod(qf.unit, qf.value, delta) }));
+  if (!qf) return;
+  let value = stepPeriod(qf.unit, qf.value, delta);
+  if (isListUnit(qf.unit)) {
+    const list = quickChoices();
+    const next = list[list.findIndex((v) => v.value === qf.value) + delta];
+    if (!next) return;
+    value = next.value;
+  }
+  editType((t) => (t.quickFilter = { ...qf, value }));
+}
+
+export function setQuickValue(value: string) {
+  const qf = currentSheet().type.quickFilter;
+  if (qf) editType((t) => (t.quickFilter = { ...qf, value }));
 }
 
 /** Switches a date quick filter between year and month, staying in the same year. */

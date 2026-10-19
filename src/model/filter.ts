@@ -98,7 +98,7 @@ export const isActive = (f?: ColumnFilter) => !!f && (!!f.values || !!f.conditio
 export function applyFilters(g: Graph, type: GraphNode, columns: Column[], rows: GraphNode[], exceptKey?: string): GraphNode[] {
   const qf = type.quickFilter;
   const qcol = qf && qf.key !== exceptKey ? columns.find((c) => c.key === qf.key) : undefined;
-  if (qf && qcol) rows = rows.filter((n) => periodOf(g, n, qcol, qf.unit) === qf.value);
+  if (qf && qcol) rows = rows.filter((n) => quickKeys(g, n, qcol, qf.unit).includes(qf.value));
   if (!type.filterOn || !type.filters) return rows;
   const active = columns.filter((c) => c.key !== exceptKey && isActive(type.filters![c.key]));
   return active.length ? rows.filter((n) => active.every((c) => passes(g, n, c, type.filters![c.key]))) : rows;
@@ -106,13 +106,39 @@ export function applyFilters(g: Graph, type: GraphNode, columns: Column[], rows:
 
 // --- Quick filter periods ---
 
-/** Period of a cell for the quick filter: "2026" (year), "2026-05" (month) or the number itself; undefined when empty. */
+/** Period of a cell for the quick filter: "2026" (year), "2026-05" (month), the number or the text; undefined when empty. */
 export function periodOf(g: Graph, node: GraphNode, col: Column, unit: QuickFilter["unit"]): string | undefined {
-  const { value } = shownColumn(g, node, col);
-  if (unit === "number") return typeof value === "number" ? String(value) : undefined;
-  if (typeof value !== "string" || !/^\d{4}-\d{2}/.test(value)) return undefined;
-  return unit === "year" ? value.slice(0, 4) : value.slice(0, 7);
+  return quickKeys(g, node, col, unit)[0];
 }
+
+/** The quick filter values a cell matches – several for a cell with several links. */
+export function quickKeys(g: Graph, node: GraphNode, col: Column, unit: QuickFilter["unit"]): string[] {
+  const { col: shown, value } = shownColumn(g, node, col);
+  if (value === undefined || value === "") return [];
+  if (unit === "link") return shown.type === "relation" ? linkIds(value).filter((id) => g.nodes[id]) : [];
+  if (unit === "text") return [rawValue(g, shown, value)];
+  if (unit === "number") return typeof value === "number" ? [String(value)] : [];
+  if (typeof value !== "string" || !/^\d{4}-\d{2}/.test(value)) return [];
+  return [unit === "year" ? value.slice(0, 4) : value.slice(0, 7)];
+}
+
+/** Distinct values of a column for a list quick filter (links, text), sorted by name, with counts. */
+export function quickValues(g: Graph, col: Column, rows: GraphNode[], unit: QuickFilter["unit"]): { value: string; label: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const n of rows) for (const k of new Set(quickKeys(g, n, col, unit))) counts.set(k, (counts.get(k) ?? 0) + 1);
+  return [...counts]
+    .map(([value, count]) => ({ value, count, label: quickLabel(g, unit, value) }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+/** Text of a quick filter value: the linked row's name, the month, or the value itself. */
+export function quickLabel(g: Graph, unit: QuickFilter["unit"], value: string): string {
+  if (unit === "link") return g.nodes[value] ? nodeName(g, g.nodes[value]) : value;
+  return periodLabel(unit, value);
+}
+
+/** List quick filters step through the values that exist rather than through a calendar. */
+export const isListUnit = (unit: QuickFilter["unit"]) => unit === "link" || unit === "text";
 
 /** The period before or after `value` (‹ ›). */
 export function stepPeriod(unit: QuickFilter["unit"], value: string, delta: number): string {

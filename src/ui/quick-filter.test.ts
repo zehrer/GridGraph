@@ -6,7 +6,7 @@ import { nodeName } from "../model/graph";
 import { filteredOut, periodLabel, stepPeriod } from "../model/filter";
 import { setLocale } from "../model/locale";
 import leMonde from "../model/samples/le-monde-100-books.json";
-import { applyViewById, clearQuickFilter, currentSheet, saveViewAs, startQuickFilter, stepQuickFilter, toggleQuickUnit } from "./actions";
+import { applyViewById, quickChoices, setQuickValue, clearQuickFilter, currentSheet, saveViewAs, startQuickFilter, stepQuickFilter, toggleQuickUnit } from "./actions";
 
 const names = () => currentSheet().rows.map((n) => nodeName(useStore.getState().graph, n));
 const col = (label: string) => currentSheet().columns.findIndex((c) => c.label === label) + 1;
@@ -63,5 +63,31 @@ describe("quick filter", () => {
     applyViewById(id);
     expect(currentSheet().type.quickFilter).toEqual({ key: "birthday", unit: "year", value: "1998" });
     expect(names()).toEqual(["Bob Meier"]);
+  });
+
+  it("filters link columns by a linked row and steps through the existing values", () => {
+    useStore.getState().open(fromJSON(JSON.stringify(leMonde)), newDbInfo());
+    const publisher = col("First publisher");
+    const row = currentSheet().rows.findIndex((n) => n.id === "buch_001") + 1;
+    useStore.getState().select({ row, col: publisher });
+    startQuickFilter(publisher, "link");
+    expect(currentSheet().type.quickFilter).toEqual({ key: "verlag", unit: "link", value: "verlag_gallimard" });
+    // Proust (Grasset and Gallimard) counts for Gallimard too.
+    expect(names()).toContain("In Search of Lost Time");
+    const choices = quickChoices();
+    const at = choices.findIndex((c) => c.value === "verlag_gallimard");
+    stepQuickFilter(1);
+    expect(currentSheet().type.quickFilter?.value).toBe(choices[at + 1].value);
+    setQuickValue(choices[0].value);
+    stepQuickFilter(-1);
+    expect(currentSheet().type.quickFilter?.value).toBe(choices[0].value);
+  });
+
+  it("filters text columns by value", () => {
+    useStore.getState().open(fromJSON(JSON.stringify(leMonde)), newDbInfo());
+    startQuickFilter(col("Genre"), "text");
+    const first = quickChoices()[0];
+    expect(currentSheet().type.quickFilter?.value).toBe(first.label);
+    expect(currentSheet().rows).toHaveLength(first.count);
   });
 });

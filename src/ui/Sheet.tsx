@@ -4,7 +4,7 @@ import { displayValue, linkIds, nodeColor, nodeName } from "../model/graph";
 import { parseClipboard, toHTML, toTSV } from "../model/clipboard";
 import { SUMMARIES, summarize } from "../model/summary";
 import { shownColumn } from "../model/formula";
-import type { Column, Graph, GraphNode } from "../model/types";
+import type { Column, Graph, GraphNode, QuickFilter } from "../model/types";
 import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
 import { FilterPanel } from "./FilterPanel";
@@ -165,9 +165,11 @@ export function Sheet() {
     const c = m.columns[col - 1];
     const kinds = new Set(m.base.map((n) => shownColumn(graph, n, c).col.type));
     const qf = m.type.quickFilter?.key === c.key ? m.type.quickFilter : undefined;
-    const item = (unit: "year" | "month" | "number", label: string): MenuItem => ({ label: `${qf?.unit === unit ? "✓ " : ""}${label}`, action: () => A.startQuickFilter(col, unit) });
+    const item = (unit: QuickFilter["unit"], label: string): MenuItem => ({ label: `${qf?.unit === unit ? "✓ " : ""}${label}`, action: () => A.startQuickFilter(col, unit) });
     if (kinds.has("date") || c.type === "date") return [item("year", "Quick filter by year"), item("month", "Quick filter by month")];
     if (kinds.has("number") || c.type === "number") return [item("number", "Quick filter by value")];
+    if (kinds.has("relation") || c.type === "relation") return [item("link", "Quick filter by value")];
+    if (kinds.has("text") || c.type === "text") return [item("text", "Quick filter by value")];
     return [];
   };
   const columnMenu = (col: number): MenuItem[] => {
