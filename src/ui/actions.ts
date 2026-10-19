@@ -1,7 +1,7 @@
 import { addInstance, addType, columnsOf, convertColumn, deleteNode, renumber, typesOf, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
 import { guessDateFormat, parseNumber } from "../model/locale";
 import { cellValue, renameReference, shownColumn } from "../model/formula";
-import { download, importText, toGraphML, toJSON } from "../model/io";
+import { download, fromJSON, importText, toGraphML, toJSON } from "../model/io";
 import { toHTML as toStandaloneHTML } from "../model/html-export";
 import { decodeText } from "../model/csv";
 import { sampleGraph } from "../model/sample";
@@ -446,6 +446,18 @@ export function newSheet() {
   useStore.getState().setActiveType(id);
 }
 
+/** Hides or shows a sheet (type). The last visible sheet cannot be hidden. */
+export function setSheetHidden(typeId: string, hidden: boolean) {
+  const { graph, activeTypeId, setActiveType, edit } = useStore.getState();
+  const visible = typesOf(graph).filter((t) => !t.hiddenSheet && t.id !== typeId);
+  if (hidden && !visible.length) return alert("At least one sheet has to stay visible.");
+  edit((g) => {
+    if (hidden) g.nodes[typeId].hiddenSheet = true;
+    else delete g.nodes[typeId].hiddenSheet;
+  });
+  if (hidden && activeTypeId === typeId) setActiveType(visible[0].id);
+}
+
 export function deleteSheet(typeId: string) {
   const g = useStore.getState().graph;
   const t = g.nodes[typeId];
@@ -529,6 +541,12 @@ export const importCSV = () => importFile(".csv,.tsv,.tab,.txt,text/csv,text/tab
 
 export const newDatabase = () => openNew(emptyGraph());
 export const loadSample = () => openNew(sampleGraph(), "Sample data");
+
+/** Second demo: Le Monde's "100 books of the century" with authors, first publishers and countries (a hidden lookup sheet). Loaded on demand. */
+export async function loadLeMondeSample() {
+  const data = (await import("../model/samples/le-monde-100-books.json")).default;
+  await openNew(fromJSON(JSON.stringify(data)), "Le Monde – 100 books of the century");
+}
 
 export function deleteCurrentDatabase() {
   const { db, dbs } = useStore.getState();

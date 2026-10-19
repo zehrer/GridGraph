@@ -24,6 +24,7 @@ Live: https://zehrer.github.io/GridGraph/
 | Confirm / cancel | Enter, Tab / Esc |
 | Select a range | Drag, Shift + click, Shift + arrow keys |
 | Copy / cut / paste | ⌘C / ⌘X / ⌘V – works with Numbers, Google Sheets and Excel |
+| Sheets | Tab menu: rename, color, hide (e.g. lookup tables – View → Hidden sheets brings them back), delete |
 | Columns | ▾ on a header: sort, move, wrap, hide, delete; drag a header to move it, drag its border to resize |
 | Rows | ＋ Row / − Row in the toolbar or right click; Shift+Space selects whole rows; Data → Renumber IDs closes gaps |
 | Summary row | Click below a column to show Sum, Average, Min, Max, Count or Empty; View → Summary row hides it |
@@ -48,7 +49,7 @@ SUM([Client].[Employees])
 
 Columns are referenced by name; `.[Column]` follows a link. Functions: IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT.
 
-**File menu**: new database, saved databases in this browser, import/export as JSON or GraphML (Gephi, yEd, Cytoscape), **import CSV/TSV** as a new sheet (separator and encoding detected automatically), sample data, and **Export as HTML** – a single file anyone can view in a browser, with an “Open in GridGraph” button to edit the data again.
+**File menu**: new database, saved databases in this browser, import/export as JSON or GraphML (Gephi, yEd, Cytoscape), **import CSV/TSV** as a new sheet (separator and encoding detected automatically), two sample databases (Projects & people, Le Monde’s 100 books), and **Export as HTML** – a single file anyone can view in a browser, with an “Open in GridGraph” button to edit the data again.
 
 See [docs/requirements.md](docs/requirements.md) for requirements and decisions.
 

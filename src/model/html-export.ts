@@ -65,7 +65,8 @@ ${viewTables.join("\n")}
 }
 
 export function toHTML(g: Graph, name: string, appUrl: string): string {
-  const types = typesOf(g);
+  // Hidden sheets (lookup tables) are left out of the navigation and come last, so links to them still work.
+  const types = [...typesOf(g).filter((t) => !t.hiddenSheet), ...typesOf(g).filter((t) => t.hiddenSheet)];
   const date = new Date().toLocaleString();
   // "</" inside the embedded JSON would end the script element early.
   const json = toJSON(g).replace(/<\//g, "<\\/");
@@ -115,7 +116,7 @@ export function toHTML(g: Graph, name: string, appUrl: string): string {
   <p>This is a read-only copy. To edit it, open it in <a href="${esc(appUrl)}">GridGraph</a> – a free app that runs in your browser and stores data only there. If the button does not work, open GridGraph and choose <b>File → Import</b> with this file.</p>
   <button id="open-in-gridgraph" type="button">Open in GridGraph</button>
 </div>
-<nav>${types.map((t) => `<a href="#${anchor(t.id)}">${esc(t.label)}</a>`).join("")}</nav>
+<nav>${types.filter((t) => !t.hiddenSheet).map((t) => `<a href="#${anchor(t.id)}">${esc(t.label)}</a>`).join("")}</nav>
 ${types.map((t) => sheet(g, t)).join("\n")}
 <footer>Made with <a href="${esc(appUrl)}">GridGraph</a> · <a href="https://github.com/zehrer/GridGraph">github.com/zehrer/GridGraph</a></footer>
 <script type="application/json" id="gridgraph-data">${json}</script>

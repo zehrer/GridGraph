@@ -56,6 +56,8 @@ interface State {
   focusNodeId: string | null;
   /** Types whose nodes the graph leaves out (toggled in the legend; kept for the session). */
   hiddenTypes: string[];
+  /** Hidden sheets the user chose to show in the graph anyway (session). */
+  shownTypes: string[];
   /** A CSV/TSV file waiting in the import dialog. */
   csvImport: { fileName: string; text: string; encoding: string } | null;
   /** Key of the column whose formula is being edited (active sheet). */
@@ -86,7 +88,9 @@ const HISTORY = 100;
 /** A sheet needs at least one type to show; also keeps activeTypeId valid. */
 function settle(g: Graph, activeTypeId: string) {
   if (!typesOf(g).length) addType(g);
-  return g.nodes[activeTypeId]?.isType ? activeTypeId : typesOf(g)[0].id;
+  if (g.nodes[activeTypeId]?.isType) return activeTypeId;
+  const types = typesOf(g);
+  return (types.find((t) => !t.hiddenSheet) ?? types[0]).id;
 }
 
 export const useStore = create<State>()((set, get) => {
@@ -117,6 +121,7 @@ export const useStore = create<State>()((set, get) => {
     formulaEditor: null,
     csvImport: null,
     hiddenTypes: [],
+    shownTypes: [],
     sort: null,
     filter: "",
     savedAt: null,
@@ -141,7 +146,7 @@ export const useStore = create<State>()((set, get) => {
     open: (g, db, dirty = false) =>
       set({
         graph: normalize(g), db, past: [], future: [], view: "sheet", activeTypeId: settle(g, ""),
-        sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "", hiddenTypes: [], back: null,
+        sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "", hiddenTypes: [], shownTypes: [], back: null,
         savedAt: dirty ? null : new Date(db.updatedAt), revision: get().revision + (dirty ? 1 : 0),
       }),
     rename: (name) => set({ db: { ...get().db, name }, revision: get().revision + 1 }),

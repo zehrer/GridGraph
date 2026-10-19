@@ -41,6 +41,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | ID | Requirement | Status |
 |---|---|---|
 | SH-1 | One **sheet tab per type** at the bottom: add (+), list all (≡), rename (double-click), color, delete. | Done |
+| SH-1a | **Hidden sheets** (tab menu → Hide sheet), e.g. for lookup tables: not among the tabs, still listed in ≡ All sheets (marked hidden) and View → Hidden sheets (Show "X"); still usable as link targets – following a link opens the hidden sheet temporarily (dimmed tab). Saved with the database; the last visible sheet cannot be hidden; a database opens on a visible sheet. | Done |
 | SH-2 | The **header row** (sticky) shows the property names; there are no A/B/C column letters. Typing a name into an empty header cell creates a column. | Done |
 | SH-3 | The first column is the read-only **ID**, fixed on the left; it doubles as the row header (there are no separate row numbers) but selects like any other column. Shift+Space extends the selection to whole rows. Rows are sorted by ID unless the user sorts by a column. | Done |
 | SH-3a | The **name column** is marked (◆, blue header) but can sit anywhere; any column can be made the name column from the column menu. It cannot be deleted. | Done |
@@ -128,6 +129,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | GR-7 | **Hide type nodes** (◆ button): type nodes and `typeOf` edges are left out of drawing and layout, and a legend lists the types with color and count. Remembered per browser. | Done |
 | GR-8 | Clicking a legend entry **hides or shows that type's nodes** (and their edges) in the graph; hidden entries are dimmed. Kept while switching views, reset when another database opens. | Done |
 | GR-9 | **Sheet filters apply to the graph**: rows hidden by their sheet's column filters (and so by the active filter view) are left out of the graph with their edges. A funnel toggle in the graph tools turns this off (on by default, per browser; green while rows are hidden); the legend shows visible/total per type, e.g. "Person 2/3". | Done |
+| GR-10 | Hidden sheets are left out of the graph by default; the legend lists them dimmed and a click shows them (for the session). | Done |
 
 ## 7. Databases, storage and files
 
@@ -142,11 +144,12 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | DB-7 | **Undo/redo** (up to 100 steps) per opened database; switching databases clears the history. | Done |
 | DB-8 | Export as JSON (full model) and GraphML (for Gephi, yEd, Cytoscape; includes derived edges). File name = database name + date. | Done |
 | DB-9 | Import JSON (current and v1 format) and GraphML (also foreign files with generated key ids). An import opens as a new database named after the file. | Done |
-| DB-10 | "Open sample data" opens a demo database (Person, Company, Project). | Done |
+| DB-10 | Two sample databases: "Projects & people" (small, with formulas) and "Le Monde's 100 books" (100 books, authors, first publishers, countries as a hidden lookup sheet; loaded on demand). | Done |
 | DB-11 | Data saved by version 0.2 (single database) is migrated on first start. | Done |
 | DB-13 | **Export as HTML**: one self-contained file that shows every sheet as a table in any browser without GridGraph or internet – IDs, column order, display formats, formula results, summary rows; link cells are anchors to the linked row. Printable. | Done |
 | DB-14 | The HTML export has a box with a link to GridGraph and an **Open in GridGraph** button: it opens the app in a new tab and hands over the embedded database by `postMessage` (not via a server or the URL); the app asks before opening it as a new database. Fallback: File → Import accepts the HTML file, which embeds the full database as JSON. | Done |
 | DB-18 | The HTML export includes filter views: sheets with views get a selector; each view is precomputed at export time (rows, columns, order, summaries). A link to a row hidden by the current view switches that sheet back to "All rows". | Done |
+| DB-19 | The HTML export leaves hidden sheets out of the navigation and puts them last, so links to them still work. | Done |
 | DB-15 | **Import CSV / TSV** (File menu, or any .csv/.tsv/.txt via File → Import) as a **new sheet** of the open database, named after the file. A preview dialog shows rows, columns, separator and encoding; the separator can be changed, and "First row contains the column names" is on by default. | Done |
 | DB-16 | The CSV import is fault-tolerant: detects the separator (comma, semicolon, tab, pipe) from the most consistent column count; quoted cells with `""` and line breaks; CRLF/LF/CR; UTF-8 with or without BOM, falling back to Windows-1252 (Excel); skips empty lines; pads short rows and names extra columns; empty or repeated headings get unique names; an unclosed quote does not swallow the file. Column types are guessed (number incl. decimal comma, date incl. DD.MM.YYYY, yes/no), the first column becomes the name column, and an "ID" column of unique whole numbers is kept as the row IDs. | Done |
 | DB-17 | Export as CSV. | Planned |

@@ -304,3 +304,4 @@ main { flex: 1; min-height: 0; display: flex; }
 .graph-tools .funnel { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.2; vertical-align: -2px; }
 .graph-tools button.filtered { background: #ceead6; color: #0d652d; }
 .graph-tools button.filtered .funnel { fill: currentColor; }
+.tab.hidden-sheet span { font-style: italic; opacity: 0.7; }

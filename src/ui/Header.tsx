@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useStore } from "../model/store";
+import { typesOf } from "../model/graph";
 import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
 import { openDatabase } from "../model/persist";
@@ -56,6 +57,7 @@ export function Header() {
   const hasCol = sel.col >= 1 && sel.col <= m.columns.length && m.columns[sel.col - 1].key !== m.type.nameKey;
   const hiddenCount = m.all.filter((c) => c.hidden).length;
   const sheet = s.view === "sheet";
+  const hiddenSheets = typesOf(s.graph).filter((t) => t.hiddenSheet);
   const colSelected = sel.col === 0 || !!m.columns[sel.col - 1];
 
   const menus: { label: string; items: MenuItem[] }[] = [
@@ -65,7 +67,8 @@ export function Header() {
         { label: "New database", action: A.newDatabase },
         { label: "Import (JSON, GraphML, HTML, CSV)…", shortcut: `${MOD}O`, action: () => A.importFile() },
         { label: "Import CSV / TSV as sheet…", action: A.importCSV },
-        { label: "Open sample data", action: A.loadSample },
+        { label: "Open sample: Projects & people", action: A.loadSample },
+        { label: "Open sample: Le Monde's 100 books", action: A.loadLeMondeSample },
         "-",
         { label: "Export as JSON", action: A.exportJSON },
         { label: "Export as GraphML", action: A.exportGraphML },
@@ -103,6 +106,8 @@ export function Header() {
         "-",
         { label: `${s.prefs.summaryRow ? "✓ " : "\u2003"}Summary row`, action: () => s.setPrefs({ summaryRow: !s.prefs.summaryRow }) },
         { label: hiddenCount ? `Show ${hiddenCount} hidden column${hiddenCount > 1 ? "s" : ""}` : "No hidden columns", disabled: !hiddenCount, action: () => A.unhideColumns() },
+        ...(hiddenSheets.length ? (["-", { heading: "Hidden sheets" }] as MenuItem[]) : []),
+        ...hiddenSheets.map((t): MenuItem => ({ label: `Show “${t.label}”`, action: () => A.setSheetHidden(t.id, false) })),
         "-",
         { label: "Settings…", action: () => setSettings(true) },
       ],

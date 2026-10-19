@@ -58,6 +58,8 @@ export interface GraphNode {
   typeId?: string;
   color?: string;
   // Types only:
+  /** Hidden sheet (e.g. a lookup table): not among the tabs, left out of the graph by default. */
+  hiddenSheet?: boolean;
   columns?: Column[];
   /** Key of the column that names the instances (graph labels, link matching). */
   nameKey?: string;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../model/store";
 import { PALETTE, typesOf } from "../model/graph";
-import { currentSheet, deleteSheet, newSheet } from "./actions";
+import { currentSheet, deleteSheet, newSheet, setSheetHidden } from "./actions";
 import { MenuList } from "./Menu";
 import { SelectionStats } from "./SelectionStats";
 
@@ -22,14 +22,21 @@ export function SheetTabs() {
       <button className="icon" title="Add sheet (type)" onClick={newSheet}>+</button>
       <div className="menu-anchor">
         <button className="icon" title="All sheets" onClick={() => setMenu("list")}>≡</button>
-        {menu === "list" && <MenuList up onClose={() => setMenu(null)} items={types.map((t) => ({ label: t.label ?? "", action: () => setActiveType(t.id) }))} />}
+        {menu === "list" && (
+          <MenuList
+            up
+            onClose={() => setMenu(null)}
+            items={types.map((t) => ({ label: `${t.label ?? ""}${t.hiddenSheet ? " (hidden)" : ""}`, action: () => (setActiveType(t.id), useStore.getState().setView("sheet")) }))}
+          />
+        )}
       </div>
-      {types.map((t) => {
+      {types.filter((t) => !t.hiddenSheet || t.id === activeTypeId).map((t) => {
         const active = t.id === activeTypeId && view === "sheet";
         return (
           <div
             key={t.id}
-            className={`tab menu-anchor${active ? " active" : ""}`}
+            className={`tab menu-anchor${active ? " active" : ""}${t.hiddenSheet ? " hidden-sheet" : ""}`}
+            title={t.hiddenSheet ? "Hidden sheet – shown while it is open" : undefined}
             style={active ? { borderBottomColor: t.color } : undefined}
             onClick={() => {
               setActiveType(t.id);
@@ -53,6 +60,9 @@ export function SheetTabs() {
             {menu === t.id && (
               <MenuList up onClose={() => setMenu(null)} items={[
                 { label: "Rename", action: () => setRenaming(t.id) },
+                t.hiddenSheet
+                  ? { label: "Show sheet", action: () => setSheetHidden(t.id, false) }
+                  : { label: "Hide sheet", disabled: types.filter((x) => !x.hiddenSheet).length < 2, action: () => setSheetHidden(t.id, true) },
                 { label: "Delete", action: () => deleteSheet(t.id) },
               ]}>
                 <div className="swatches">

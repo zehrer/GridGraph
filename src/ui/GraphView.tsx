@@ -9,7 +9,13 @@ import { filteredOut } from "../model/filter";
 export function GraphView() {
   const ref = useRef<HTMLCanvasElement>(null);
   const canvas = useRef<GraphCanvas | null>(null);
-  const { graph, focusNodeId, edit, prefs, setPrefs, hiddenTypes } = useStore();
+  const { graph, focusNodeId, edit, prefs, setPrefs, hiddenTypes: legendOff, shownTypes } = useStore();
+  // Hidden sheets (lookup tables) stay out of the graph unless shown from the legend.
+  const hiddenTypes = useMemo(
+    () => [...legendOff, ...typesOf(graph).filter((t) => t.hiddenSheet && !shownTypes.includes(t.id)).map((t) => t.id)],
+    [legendOff, shownTypes, graph],
+  );
+  const hasHiddenSheets = typesOf(graph).some((t) => t.hiddenSheet);
   const showTypes = prefs.graphTypes;
   const [selected, setSelected] = useState<string | null>(focusNodeId);
 
@@ -24,7 +30,7 @@ export function GraphView() {
     });
     canvas.current = c;
     c.setShowTypes(useStore.getState().prefs.graphTypes);
-    c.setHiddenTypes(useStore.getState().hiddenTypes);
+    c.setHiddenTypes(hiddenTypes);
     if (useStore.getState().prefs.graphFilters) c.setHiddenNodes(filteredOut(useStore.getState().graph));
     c.setGraph(useStore.getState().graph);
     // Let the layout settle a little, then frame the graph (or the focused node).
@@ -46,7 +52,9 @@ export function GraphView() {
     return shown === all.length ? String(all.length) : `${shown}/${all.length}`;
   };
   const toggleType = (id: string) =>
-    useStore.setState({ hiddenTypes: hiddenTypes.includes(id) ? hiddenTypes.filter((t) => t !== id) : [...hiddenTypes, id] });
+    graph.nodes[id]?.hiddenSheet
+      ? useStore.setState({ shownTypes: shownTypes.includes(id) ? shownTypes.filter((t) => t !== id) : [...shownTypes, id] })
+      : useStore.setState({ hiddenTypes: legendOff.includes(id) ? legendOff.filter((t) => t !== id) : [...legendOff, id] });
 
   const node = selected ? graph.nodes[selected] : undefined;
   const select = (id: string) => {
@@ -72,7 +80,7 @@ export function GraphView() {
           <svg className="funnel" viewBox="0 0 12 12" aria-hidden><path d="M1 2h10L7 6.5V10L5 11V6.5Z" /></svg>
         </button>
       </div>
-      {!showTypes && (
+      {(!showTypes || hasHiddenSheets) && (
         <div className="graph-legend">
           {typesOf(graph).map((t) => (
             <button
