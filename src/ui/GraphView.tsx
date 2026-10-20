@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../model/store";
-import { addEdge, columnsOf, deleteEdge, deleteNode, displayValue, edgesOf, instancesOf, nodeColor, nodeName, typesOf } from "../model/graph";
+import { addEdge, columnsOf, deleteEdge, deleteNode, displayValue, edgesOf, instancesOf, newId, nodeColor, nodeName, typesOf, upsertColumn } from "../model/graph";
+import { ModelInspector } from "./ModelInspector";
 import { showInSheet } from "./actions";
 import { GraphCanvas } from "./graph-canvas";
 import { shownColumn } from "../model/formula";
@@ -17,6 +18,7 @@ export function GraphView() {
   );
   const hasHiddenSheets = typesOf(graph).some((t) => t.hiddenSheet);
   const showTypes = prefs.graphTypes;
+  const mode = prefs.graphMode;
   const [selected, setSelected] = useState<string | null>(focusNodeId);
 
   useEffect(() => {
@@ -24,11 +26,19 @@ export function GraphView() {
       select: setSelected,
       open: showInSheet,
       connect: (source, target) => {
+        const g0 = useStore.getState().graph;
+        // In the model, connecting two types adds a link column to the source type.
+        if (useStore.getState().prefs.graphMode === "model") {
+          const label = prompt(`New link column on "${g0.nodes[source]?.label}" pointing to "${g0.nodes[target]?.label}":`, g0.nodes[target]?.label ?? "Link")?.trim();
+          if (label) useStore.getState().edit((g) => upsertColumn(g, source, { key: newId("c"), label, type: "relation", targetTypeId: target }));
+          return;
+        }
         const relation = prompt("Relation name:", "relatesTo")?.trim();
         if (relation) useStore.getState().edit((g) => addEdge(g, source, target, relation));
       },
     });
     canvas.current = c;
+    c.setMode(useStore.getState().prefs.graphMode);
     c.setShowTypes(useStore.getState().prefs.graphTypes);
     c.setHiddenTypes(hiddenTypes);
     if (useStore.getState().prefs.graphFilters) c.setHiddenNodes(filteredOut(useStore.getState().graph));
@@ -41,6 +51,10 @@ export function GraphView() {
 
   useEffect(() => canvas.current?.setGraph(graph), [graph]);
   useEffect(() => canvas.current?.setShowTypes(showTypes), [showTypes]);
+  useEffect(() => {
+    canvas.current?.setMode(mode);
+    setSelected(null);
+  }, [mode]);
   useEffect(() => canvas.current?.setHiddenTypes(hiddenTypes), [hiddenTypes]);
   // The sheets' column filters (and so their filter views) also apply to the graph.
   const filtered = useMemo(() => filteredOut(graph), [graph]);
@@ -65,10 +79,15 @@ export function GraphView() {
   return (
     <div className="graph-view">
       <canvas ref={ref} />
+      <div className="graph-mode segmented" role="tablist">
+        <button className={mode === "data" ? "on" : ""} title="Rows and their links" onClick={() => setPrefs({ graphMode: "data" })}>Data</button>
+        <button className={mode === "model" ? "on" : ""} title="Types, their properties and how they link (meta model)" onClick={() => setPrefs({ graphMode: "model" })}>Model</button>
+      </div>
       <div className="graph-tools">
         <button title="Zoom in" onClick={() => canvas.current?.zoomBy(1.25)}>+</button>
         <button title="Zoom out" onClick={() => canvas.current?.zoomBy(0.8)}>−</button>
         <button title="Fit to screen" onClick={() => canvas.current?.fit()}>⤢</button>
+        {mode === "data" && <>
         <button className={showTypes ? "on" : ""} title={showTypes ? "Hide type nodes (show a legend)" : "Show type nodes"} onClick={() => setPrefs({ graphTypes: !showTypes })}>
           ◆
         </button>
@@ -79,8 +98,9 @@ export function GraphView() {
         >
           <svg className="funnel" viewBox="0 0 12 12" aria-hidden><path d="M1 2h10L7 6.5V10L5 11V6.5Z" /></svg>
         </button>
+        </>}
       </div>
-      {(!showTypes || hasHiddenSheets) && (
+      {mode === "data" && (!showTypes || hasHiddenSheets) && (
         <div className="graph-legend">
           {typesOf(graph).map((t) => (
             <button
@@ -96,9 +116,16 @@ export function GraphView() {
           ))}
         </div>
       )}
-      <div className="graph-hint">Drag: move · Shift + drag: create edge · Double-click: open in table</div>
+      <div className="graph-hint">
+        {mode === "model"
+          ? "Model: types with their properties · Shift + drag from type to type: add a link column · Double-click: open sheet"
+          : "Drag: move · Shift + drag: create edge · Double-click: open in table"}
+      </div>
 
-      {node && (
+      {mode === "model" && selected && (
+        <ModelInspector typeId={selected} onSelect={select} onClose={() => (setSelected(null), canvas.current && (canvas.current.selected = null))} />
+      )}
+      {mode === "data" && node && (
         <aside className="inspector">
           <header>
             <i style={{ background: nodeColor(graph, node) }} />

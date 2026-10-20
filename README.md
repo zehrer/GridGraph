@@ -14,6 +14,7 @@ Live: https://zehrer.github.io/GridGraph/
 - **Header row = properties**: typing a name into the header row creates a column. Instances may have extra properties; they show up as columns automatically.
 - **Data types** (toolbar → column type): Text, Number, Date, Yes/No and *Link to type*. A link cell creates graph edges and can hold several targets separated by commas; typing an unknown name creates the target instance.
 - Free edges are drawn in the graph view with **Shift + drag**.
+- The graph view switches between **Data** (rows and their links) and **Model** (the meta model: types as cards with all their properties, link columns as edges; Shift + drag between types adds a link column).
 
 ## Usage
 

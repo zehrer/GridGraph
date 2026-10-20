@@ -1,12 +1,23 @@
-import { edgesOf, nodeColor, nodeName } from "../model/graph";
-import type { DerivedEdge, Graph, GraphNode } from "../model/types";
+import { columnsOf, edgesOf, instancesOf, nodeColor, nodeName, typesOf } from "../model/graph";
+import { metaRelations } from "../model/meta";
+import type { Column, DerivedEdge, Graph, GraphNode } from "../model/types";
 
 interface Body { x: number; y: number; vx: number; vy: number; pinned?: boolean }
+
+/** "data": rows and their links; "model": types as cards with their properties, linked by link columns. */
+export type GraphMode = "data" | "model";
 
 const FONT = "Roboto, -apple-system, 'Segoe UI', Arial, sans-serif";
 const radius = (n: GraphNode) => (n.isType ? 14 : 22);
 
-/** Layout positions survive view switches; they are not part of the saved data. */
+// Model cards: a title bar and one line per property.
+const CARD_W = 200;
+const CARD_HEAD = 28;
+const CARD_LINE = 16;
+const CARD_MAX_LINES = 14;
+const ICON: Record<Column["type"], string> = { text: "Aa", number: "#", date: "◷", boolean: "☑", relation: "↗", formula: "ƒ" };
+
+/** Layout positions survive view switches; they are not part of the saved data. Model cards have their own ("m:" keys). */
 const bodies = new Map<string, Body>();
 
 export interface CanvasEvents {
@@ -15,6 +26,8 @@ export interface CanvasEvents {
   connect: (source: string, target: string) => void;
 }
 
+interface Card { cols: Column[]; rows: number; w: number; h: number }
+
 /** Canvas renderer with a force-directed layout, pan/zoom, drag and shift-drag to connect. */
 export class GraphCanvas {
   private ctx: CanvasRenderingContext2D;
@@ -22,6 +35,8 @@ export class GraphCanvas {
   /** Nodes and edges currently drawn: without type nodes and typeOf edges when types are hidden. */
   private nodes: GraphNode[] = [];
   private edges: DerivedEdge[] = [];
+  private cards = new Map<string, Card>();
+  private mode: GraphMode = "data";
   private showTypes = true;
   private hiddenTypes = new Set<string>();
   private hiddenNodes = new Set<string>();
@@ -49,15 +64,19 @@ export class GraphCanvas {
     for (const [type, fn] of this.listeners) this.canvas.removeEventListener(type, fn as EventListener);
   }
 
+  private body(id: string) {
+    return bodies.get(this.mode === "model" ? `m:${id}` : id);
+  }
+
   setGraph(g: Graph) {
     this.g = g;
     this.refresh();
     let added = 0;
-    for (const n of Object.values(g.nodes)) {
-      if (bodies.has(n.id)) continue;
-      const near = n.typeId ? bodies.get(n.typeId) : undefined;
-      const spread = near ? 120 : 400;
-      bodies.set(n.id, { x: (near?.x ?? 0) + (Math.random() - 0.5) * spread, y: (near?.y ?? 0) + (Math.random() - 0.5) * spread, vx: 0, vy: 0 });
+    for (const n of this.nodes) {
+      if (this.body(n.id)) continue;
+      const near = this.mode === "data" && n.typeId ? this.body(n.typeId) : undefined;
+      const spread = near ? 120 : this.mode === "model" ? 700 : 400;
+      bodies.set(this.mode === "model" ? `m:${n.id}` : n.id, { x: (near?.x ?? 0) + (Math.random() - 0.5) * spread, y: (near?.y ?? 0) + (Math.random() - 0.5) * spread, vx: 0, vy: 0 });
       added++;
     }
     this.kick();
@@ -70,7 +89,27 @@ export class GraphCanvas {
     }
   }
 
+  setMode(mode: GraphMode) {
+    if (mode === this.mode) return;
+    this.mode = mode;
+    this.selected = null;
+    this.fitOnSettle = true;
+    this.setGraph(this.g);
+  }
+
   private refresh() {
+    if (this.mode === "model") {
+      this.nodes = typesOf(this.g);
+      this.cards = new Map(this.nodes.map((t) => {
+        const cols = columnsOf(this.g, t.id);
+        const lines = Math.min(cols.length, CARD_MAX_LINES) + (cols.length > CARD_MAX_LINES ? 1 : 0);
+        return [t.id, { cols, rows: instancesOf(this.g, t.id).length, w: CARD_W, h: CARD_HEAD + Math.max(lines, 1) * CARD_LINE + 8 }];
+      }));
+      this.edges = metaRelations(this.g).map((r) => ({
+        id: r.id, source: r.from, target: r.to, relation: `${r.column.label}${r.many ? " *" : ""}`, kind: "column", colKey: r.column.key,
+      }));
+      return;
+    }
     const hidden = (n: GraphNode) => this.hiddenTypes.has(n.isType ? n.id : (n.typeId ?? "")) || this.hiddenNodes.has(n.id);
     this.nodes = Object.values(this.g.nodes).filter((n) => (this.showTypes || !n.isType) && !hidden(n));
     const shown = new Set(this.nodes.map((n) => n.id));
@@ -103,7 +142,7 @@ export class GraphCanvas {
   }
 
   focus(id: string) {
-    const b = bodies.get(id);
+    const b = this.body(id);
     this.selected = id;
     if (b) this.pan = { x: this.canvas.clientWidth / 2 - b.x * this.zoom, y: this.canvas.clientHeight / 2 - b.y * this.zoom };
     this.draw();
@@ -120,12 +159,13 @@ export class GraphCanvas {
       this.fitWhenSized = true;
       return;
     }
-    const pts = this.nodes.map((n) => bodies.get(n.id)!).filter(Boolean);
+    const pts = this.nodes.map((n) => this.body(n.id)!).filter(Boolean);
     if (!pts.length) return;
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     const [w, h] = [this.canvas.clientWidth, this.canvas.clientHeight];
+    const margin = this.mode === "model" ? 360 : 200;
     const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-    this.zoom = Math.min(Math.max(Math.min(w / (maxX - minX + 200), h / (maxY - minY + 200)), 0.2), 1.6);
+    this.zoom = Math.min(Math.max(Math.min(w / (maxX - minX + margin), h / (maxY - minY + margin)), 0.2), 1.6);
     this.pan = { x: w / 2 - ((minX + maxX) / 2) * this.zoom, y: h / 2 - ((minY + maxY) / 2) * this.zoom };
     this.draw();
   }
@@ -149,8 +189,9 @@ export class GraphCanvas {
   };
 
   private step() {
+    const model = this.mode === "model";
     const ns = this.nodes;
-    const bs = ns.map((n) => bodies.get(n.id)!);
+    const bs = ns.map((n) => this.body(n.id)!);
     const a = this.alpha;
     for (let i = 0; i < bs.length; i++) {
       const u = bs[i];
@@ -159,17 +200,19 @@ export class GraphCanvas {
         let dx = v.x - u.x, dy = v.y - u.y;
         let d2 = dx * dx + dy * dy;
         if (d2 < 1) (dx = Math.random() - 0.5), (dy = Math.random() - 0.5), (d2 = 1);
-        const f = (((ns[i].isType || ns[j].isType) ? 18000 : 12000) / (d2 + 100)) * a / Math.sqrt(d2);
+        const strength = model ? 90000 : ns[i].isType || ns[j].isType ? 18000 : 12000;
+        const f = (strength / (d2 + 100)) * a / Math.sqrt(d2);
         u.vx -= dx * f; u.vy -= dy * f; v.vx += dx * f; v.vy += dy * f;
       }
       u.vx -= u.x * 0.02 * a;
       u.vy -= u.y * 0.02 * a;
     }
     for (const e of this.edges) {
-      const u = bodies.get(e.source), v = bodies.get(e.target);
+      if (e.source === e.target) continue;
+      const u = this.body(e.source), v = this.body(e.target);
       if (!u || !v) continue;
       const dx = v.x - u.x, dy = v.y - u.y, d = Math.hypot(dx, dy) || 1;
-      const f = ((d - (e.kind === "typeOf" ? 100 : 130)) * 0.04 * a) / d;
+      const f = ((d - (model ? 300 : e.kind === "typeOf" ? 100 : 130)) * 0.04 * a) / d;
       u.vx += dx * f; u.vy += dy * f; v.vx -= dx * f; v.vy -= dy * f;
     }
     for (const b of bs) {
@@ -190,7 +233,9 @@ export class GraphCanvas {
   private hit(e: { offsetX: number; offsetY: number }) {
     const p = this.world(e);
     return [...this.nodes].reverse().find((n) => {
-      const b = bodies.get(n.id)!;
+      const b = this.body(n.id)!;
+      const card = this.mode === "model" ? this.cards.get(n.id) : undefined;
+      if (card) return Math.abs(b.x - p.x) <= card.w / 2 && Math.abs(b.y - p.y) <= card.h / 2;
       return Math.hypot(b.x - p.x, b.y - p.y) <= radius(n) + 4;
     });
   }
@@ -199,7 +244,7 @@ export class GraphCanvas {
     this.canvas.setPointerCapture(e.pointerId);
     const n = this.hit(e);
     this.drag = { id: n?.id, connect: !!n && e.shiftKey, px: e.offsetX, py: e.offsetY };
-    if (n && !e.shiftKey) bodies.get(n.id)!.pinned = true;
+    if (n && !e.shiftKey) this.body(n.id)!.pinned = true;
   };
 
   private moveHandler = (e: PointerEvent) => {
@@ -212,7 +257,7 @@ export class GraphCanvas {
     d.moved ||= Math.hypot(e.offsetX - d.px, e.offsetY - d.py) > 3;
     if (d.connect) this.draw();
     else if (d.id) {
-      Object.assign(bodies.get(d.id)!, this.pointer);
+      Object.assign(this.body(d.id)!, this.pointer);
       this.kick();
     } else {
       this.pan.x += e.offsetX - d.px;
@@ -226,9 +271,10 @@ export class GraphCanvas {
     const d = this.drag;
     this.drag = null;
     if (!d) return;
-    if (d.id) bodies.get(d.id)!.pinned = false;
+    if (d.id) this.body(d.id)!.pinned = false;
     const target = this.hit(e);
-    if (d.connect && d.id && target && target.id !== d.id) this.on.connect(d.id, target.id);
+    // In the model a type may link to itself (e.g. Person → manager).
+    if (d.connect && d.id && target && d.moved && (target.id !== d.id || this.mode === "model")) this.on.connect(d.id, target.id);
     else if (!d.moved) {
       this.selected = d.id ?? null;
       this.on.select(this.selected);
@@ -289,10 +335,10 @@ export class GraphCanvas {
 
     ctx.translate(pan.x, pan.y);
     ctx.scale(zoom, zoom);
-    for (const e of this.edges) this.drawEdge(e);
+    for (const e of this.edges) (this.mode === "model" ? this.drawRelation(e) : this.drawEdge(e));
     const d = this.drag;
     if (d?.connect && d.id) {
-      const b = bodies.get(d.id)!;
+      const b = this.body(d.id)!;
       ctx.setLineDash([6, 4]);
       ctx.strokeStyle = "#1a73e8";
       ctx.lineWidth = 2;
@@ -302,12 +348,33 @@ export class GraphCanvas {
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    for (const n of this.nodes) this.drawNode(n);
+    for (const n of this.nodes) (this.mode === "model" ? this.drawCard(n) : this.drawNode(n));
+  }
+
+  private arrow(x: number, y: number, nx: number, ny: number) {
+    const { ctx } = this;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - nx * 9 - ny * 5, y - ny * 9 + nx * 5);
+    ctx.lineTo(x - nx * 9 + ny * 5, y - ny * 9 - nx * 5);
+    ctx.fill();
+  }
+
+  private label(text: string, x: number, y: number, active: boolean) {
+    const { ctx } = this;
+    ctx.font = `11px ${FONT}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const w = ctx.measureText(text).width + 10;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(x - w / 2, y - 8, w, 16);
+    ctx.fillStyle = active ? "#1a73e8" : "#5f6368";
+    ctx.fillText(text, x, y);
   }
 
   private drawEdge(e: DerivedEdge) {
     const { ctx, g } = this;
-    const [u, v] = [bodies.get(e.source), bodies.get(e.target)];
+    const [u, v] = [this.body(e.source), this.body(e.target)];
     if (!u || !v) return;
     const dx = v.x - u.x, dy = v.y - u.y, d = Math.hypot(dx, dy) || 1, nx = dx / d, ny = dy / d;
     const [rs, rt] = [radius(g.nodes[e.source]) + 2, radius(g.nodes[e.target]) + 4];
@@ -323,28 +390,113 @@ export class GraphCanvas {
     ctx.lineTo(x2, y2);
     ctx.stroke();
     ctx.setLineDash([]);
+    this.arrow(x2, y2, nx, ny);
+    if (this.zoom > 0.5 && !typeOf) this.label(e.relation, (x1 + x2) / 2, (y1 + y2) / 2, active);
+  }
+
+  /** Where the line from a card's center towards (dx, dy) leaves the card. */
+  private cardEdge(id: string, dx: number, dy: number) {
+    const card = this.cards.get(id)!;
+    const t = Math.min(card.w / 2 / Math.abs(dx || 1e-9), card.h / 2 / Math.abs(dy || 1e-9));
+    return { x: dx * t, y: dy * t };
+  }
+
+  /** Model edge: from the source card to the target card, labelled with the link column; self-links as a loop. */
+  private drawRelation(e: DerivedEdge) {
+    const { ctx } = this;
+    const [u, v] = [this.body(e.source), this.body(e.target)];
+    if (!u || !v) return;
+    const active = this.selected === e.source || this.selected === e.target;
+    ctx.strokeStyle = ctx.fillStyle = active ? "#1a73e8" : "#80868b";
+    ctx.lineWidth = active ? 2 : 1.5;
+    if (e.source === e.target) {
+      const card = this.cards.get(e.source)!;
+      const [x, y] = [u.x + card.w / 2, u.y - card.h / 2 + 14];
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.bezierCurveTo(x + 60, y - 40, x + 60, y + 40, x, y + 18);
+      ctx.stroke();
+      this.arrow(x, y + 18, -1, 0.2);
+      if (this.zoom > 0.4) this.label(e.relation, x + 50, y + 9, active);
+      return;
+    }
+    const dx = v.x - u.x, dy = v.y - u.y, d = Math.hypot(dx, dy) || 1;
+    const a = this.cardEdge(e.source, dx, dy), b = this.cardEdge(e.target, -dx, -dy);
+    const [x1, y1, x2, y2] = [u.x + a.x, u.y + a.y, v.x + b.x - (dx / d) * 2, v.y + b.y - (dy / d) * 2];
     ctx.beginPath();
-    ctx.moveTo(x2, y2);
-    ctx.lineTo(x2 - nx * 9 - ny * 5, y2 - ny * 9 + nx * 5);
-    ctx.lineTo(x2 - nx * 9 + ny * 5, y2 - ny * 9 - nx * 5);
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    this.arrow(x2, y2, dx / d, dy / d);
+    if (this.zoom > 0.4) this.label(e.relation, (x1 + x2) / 2, (y1 + y2) / 2, active);
+  }
+
+  /** Model node: a card with the type's name, row count and properties. Hidden sheets are drawn faint. */
+  private drawCard(t: GraphNode) {
+    const { ctx } = this;
+    const b = this.body(t.id)!;
+    const card = this.cards.get(t.id)!;
+    const color = t.color ?? "#5f6368";
+    const sel = this.selected === t.id;
+    const [x, y] = [b.x - card.w / 2, b.y - card.h / 2];
+    ctx.save();
+    if (t.hiddenSheet) ctx.globalAlpha = 0.55;
+    ctx.shadowColor = "rgb(60 64 67 / 25%)";
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.roundRect(x, y, card.w, card.h, 8);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = sel ? 3 : 1.5;
+    ctx.strokeStyle = sel ? "#1a73e8" : color;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.roundRect(x, y, card.w, CARD_HEAD, [8, 8, 0, 0]);
+    ctx.fillStyle = color;
     ctx.fill();
 
-    if (this.zoom > 0.5 && !typeOf) {
-      const [mx, my] = [(x1 + x2) / 2, (y1 + y2) / 2];
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#fff";
+    ctx.font = `600 13px ${FONT}`;
+    ctx.fillText(this.fitText(t.label ?? "", card.w - 70), x + 10, y + CARD_HEAD / 2);
+    ctx.textAlign = "right";
+    ctx.font = `12px ${FONT}`;
+    ctx.fillText(`${card.rows}${t.hiddenSheet ? " · hidden" : ""}`, x + card.w - 10, y + CARD_HEAD / 2);
+
+    ctx.textAlign = "left";
+    const shown = card.cols.slice(0, CARD_MAX_LINES);
+    shown.forEach((c, i) => {
+      const ly = y + CARD_HEAD + 4 + CARD_LINE * i + CARD_LINE / 2;
+      const isName = c.key === t.nameKey;
+      ctx.fillStyle = isName ? "#0b57d0" : "#5f6368";
       ctx.font = `11px ${FONT}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const w = ctx.measureText(e.relation).width + 10;
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(mx - w / 2, my - 8, w, 16);
-      ctx.fillStyle = active ? "#1a73e8" : "#5f6368";
-      ctx.fillText(e.relation, mx, my);
+      ctx.fillText(isName ? "◆" : ICON[c.type], x + 10, ly);
+      ctx.fillStyle = "#202124";
+      ctx.font = `${isName ? "600 " : ""}12px ${FONT}`;
+      const target = c.type === "relation" && c.targetTypeId ? ` → ${this.g.nodes[c.targetTypeId]?.label ?? "?"}` : "";
+      ctx.fillText(this.fitText(`${c.label}${target}`, card.w - 40), x + 30, ly);
+    });
+    if (card.cols.length > CARD_MAX_LINES) {
+      ctx.fillStyle = "#5f6368";
+      ctx.font = `italic 11px ${FONT}`;
+      ctx.fillText(`+ ${card.cols.length - CARD_MAX_LINES} more`, x + 30, y + CARD_HEAD + 4 + CARD_LINE * CARD_MAX_LINES + CARD_LINE / 2);
     }
+    ctx.restore();
+  }
+
+  private fitText(text: string, max: number) {
+    const { ctx } = this;
+    if (ctx.measureText(text).width <= max) return text;
+    let s = text;
+    while (s.length > 1 && ctx.measureText(`${s}…`).width > max) s = s.slice(0, -1);
+    return `${s}…`;
   }
 
   private drawNode(n: GraphNode) {
     const { ctx } = this;
-    const b = bodies.get(n.id)!;
+    const b = this.body(n.id)!;
     const color = nodeColor(this.g, n);
     const r = radius(n);
     const sel = this.selected === n.id;

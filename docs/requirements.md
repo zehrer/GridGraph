@@ -136,6 +136,8 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | GR-8 | Clicking a legend entry **hides or shows that type's nodes** (and their edges) in the graph; hidden entries are dimmed. Kept while switching views, reset when another database opens. | Done |
 | GR-9 | **Sheet filters apply to the graph**: rows hidden by their sheet's column filters (and so by the active filter view) are left out of the graph with their edges. A funnel toggle in the graph tools turns this off (on by default, per browser; green while rows are hidden); the legend shows visible/total per type, e.g. "Person 2/3". | Done |
 | GR-10 | Hidden sheets are left out of the graph by default; the legend lists them dimmed and a click shows them (for the session). | Done |
+| GR-11 | **Data | Model switch** in the graph view (remembered per browser). *Model* shows the meta model: one card per type with its row count and every property (icon per data type, ◆ name column, ƒ formula, "→ Target" for links); edges are the link columns, labelled with the column name, "*" when rows hold several targets, self-links as loops; hidden sheets are drawn faint. | Done |
+| GR-12 | Model inspector: all properties with data type, format / formula / link target and fill count (filled/rows), outgoing and incoming relations, "Open sheet". **Shift + drag from type to type adds a link column** to the source type. | Done |
 
 ## 7. Databases, storage and files
 
@@ -192,6 +194,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | 2026-10-18 | The notation (decimal mark, date order, currency placement) is a personal setting, defaulting to the browser locale; input accepts a decimal comma regardless. |
 | 2026-10-18 | Computed fields are formula columns with spreadsheet-style syntax but column names instead of cell addresses (`[Birthday]`), English function names, and `.` to follow links – the graph-specific part. Results are not stored, so values like an age stay current. |
 | 2026-10-18 | A pasted table only brings its own header row into an empty sheet when it has several columns with text headings, so a pasted list of names keeps its first entry. |
+| 2026-10-20 | The meta model is derived from the types' columns, not stored separately: link columns are the relations between types, so data and model can never disagree. |
 
 ## 10. Open questions
 

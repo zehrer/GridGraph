@@ -324,3 +324,12 @@ main { flex: 1; min-height: 0; display: flex; }
 .quick-filter .switch input:checked + i { background: #188038; }
 .quick-filter .switch input:checked + i::after { left: 14px; }
 .quick-filter .switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --- Graph: data / model switch and model inspector --- */
+.graph-mode { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); box-shadow: 0 1px 3px rgb(60 64 67 / 25%); }
+.model-inspector .props { width: 100%; border-collapse: collapse; font-size: 12px; }
+.model-inspector .props td { padding: 4px 4px; border-bottom: 1px solid #f1f3f4; vertical-align: top; }
+.model-inspector .props td.name { color: var(--accent); font-weight: 500; }
+.model-inspector .props small { display: block; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; overflow-wrap: anywhere; }
+.model-inspector .props td.fill { text-align: right; color: var(--muted); white-space: nowrap; }
+.model-inspector li.none, .model-inspector .hint { color: var(--muted); font-size: 12px; }
