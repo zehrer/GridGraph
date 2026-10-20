@@ -2,7 +2,7 @@ import { useStore } from "../model/store";
 import { typesOf } from "../model/graph";
 import { ViewSelector } from "./ViewSelector";
 import { QuickFilterChips } from "./QuickFilter";
-import { addRow, currentSheet, deleteRows, goBack, setColumnType, sortBy, toggleFilters } from "./actions";
+import { addRow, convertToType, currentSheet, deleteRows, goBack, setColumnType, sortBy, toggleFilters } from "./actions";
 
 const TYPES = [
   ["text", "Text"],
@@ -38,7 +38,8 @@ export function Toolbar() {
         value={typeValue}
         onChange={(e) => {
           const v = e.target.value;
-          if (v.startsWith("rel:")) setColumnType(s.sel.col, "relation", v.slice(4));
+          if (v === "new-type") convertToType(s.sel.col);
+          else if (v.startsWith("rel:")) setColumnType(s.sel.col, "relation", v.slice(4));
           else setColumnType(s.sel.col, v as (typeof TYPES)[number][0]);
         }}
       >
@@ -51,6 +52,7 @@ export function Toolbar() {
           {typesOf(s.graph).map((t) => (
             <option key={t.id} value={`rel:${t.id}`}>→ {t.label}</option>
           ))}
+          <option value="new-type">＋ New type from these values…</option>
         </optgroup>
       </select>
       <span className="sep" />

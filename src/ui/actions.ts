@@ -1,4 +1,4 @@
-import { addInstance, addType, columnsOf, convertColumn, deleteNode, renumber, typesOf, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
+import { addInstance, addType, columnsOf, convertColumn, deleteNode, extractType, renumber, typesOf, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
 import { guessDateFormat, parseNumber } from "../model/locale";
 import { cellValue, numberFormat, renameReference, shownColumn } from "../model/formula";
 import { download, fromJSON, importText, toGraphML, toJSON } from "../model/io";
@@ -410,6 +410,17 @@ export function setColumnType(col: number, type: Column["type"], targetTypeId?: 
   if (!c) return;
   if (type === "formula") return openFormula(c.key);
   useStore.getState().edit((g) => convertColumn(g, m.type.id, c.type === "formula" ? freeze(g, m.type.id, c) : c, type, targetTypeId));
+}
+
+/** Moves the selected column's values into a new lookup type and links the rows to it. */
+export function convertToType(col: number) {
+  const m = currentSheet();
+  const c = m.columns[col - 1];
+  if (!c) return;
+  if (c.key === m.type.nameKey) return alert("The name column cannot become a type of its own. Make another column the name column first.");
+  const label = prompt(`Each distinct value of "${c.label}" becomes a row of a new type, and the column links to it.\n\nName of the new type:`, c.label)?.trim();
+  if (!label) return;
+  useStore.getState().edit((g) => extractType(g, m.type.id, c.type === "formula" ? freeze(g, m.type.id, c) : c, label));
 }
 
 /** Turns a formula column into a plain column holding its current results. */

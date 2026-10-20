@@ -132,6 +132,7 @@ export function Header() {
         { label: "Sort A → Z", disabled: !sheet || !colSelected, action: () => A.sortBy(sel.col, true) },
         { label: "Sort Z → A", disabled: !sheet || !colSelected, action: () => A.sortBy(sel.col, false) },
         { label: "Sort by ID", disabled: !sheet, action: () => useStore.setState({ sort: null }) },
+        { label: "Convert column to type…", disabled: !sheet || !colSelected || m.columns[sel.col - 1]?.key === m.type.nameKey, action: () => A.convertToType(sel.col) },
         "-",
         { label: m.type.filterOn ? "Remove filter" : "Create a filter", shortcut: `⇧${MOD}F`, disabled: !sheet, action: A.toggleFilters },
         { label: "Filter by selected value", disabled: !sheet || sel.row < 1 || sel.col < 1 || !m.rows[sel.row - 1], action: A.filterBySelectedValue },

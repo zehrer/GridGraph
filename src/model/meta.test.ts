@@ -37,3 +37,18 @@ describe("meta model", () => {
     expect(s.filled.birthday ?? Object.values(s.filled)[0]).toBeGreaterThan(0);
   });
 });
+
+describe("convert a column to a type", () => {
+  it("turns distinct values into rows of a new type and links to them", async () => {
+    const { columnsOf, extractType, instancesOf, linkIds, nodeName } = await import("./graph");
+    const g = sampleGraph();
+    const col = columnsOf(g, "type_company").find((c) => c.label === "City")!;
+    const before = instancesOf(g, "type_company").map((n) => n.props[col.key]);
+    const t = extractType(g, "type_company", col, "City");
+    expect(g.nodes[t]).toMatchObject({ isType: true, label: "City" });
+    expect(instancesOf(g, t).map((n) => nodeName(g, n)).sort()).toEqual([...new Set(before)].sort());
+    expect(columnsOf(g, "type_company").find((c) => c.key === col.key)).toMatchObject({ type: "relation", targetTypeId: t });
+    for (const n of instancesOf(g, "type_company")) expect(nodeName(g, g.nodes[linkIds(n.props[col.key])[0]])).toBe(before[instancesOf(g, "type_company").indexOf(n)]);
+    expect(metaRelations(g).some((r) => r.from === "type_company" && r.to === t)).toBe(true);
+  });
+});

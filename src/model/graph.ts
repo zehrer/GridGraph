@@ -277,4 +277,15 @@ export function convertColumn(g: Graph, typeId: string, col: Column, type: Colum
   upsertColumn(g, typeId, next);
 }
 
+/**
+ * Turns a column's distinct values into rows of a new lookup type (named `label`) and the column
+ * into a link to it – e.g. a "Country" text column into a Country sheet. Comma-separated values
+ * become several links. Returns the new type's id.
+ */
+export function extractType(g: Graph, typeId: string, col: Column, label: string): string {
+  const target = addType(g, label);
+  convertColumn(g, typeId, col, "relation", target);
+  return target;
+}
+
 export const nodeColor = (g: Graph, n: GraphNode) => n.color ?? (n.typeId && g.nodes[n.typeId]?.color) ?? "#5f6368";
