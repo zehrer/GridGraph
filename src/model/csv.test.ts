@@ -60,3 +60,16 @@ describe("CSV import", () => {
     expect(g.nodes[typeId].nextNo).toBe(8);
   });
 });
+
+describe("recognising table files", () => {
+  it("sends CSV text to the CSV import whatever the file is called", async () => {
+    const { isTableText } = await import("./io");
+    const csv = "Name, Type, Comment\nA, X1, none\nB, X0,\nC, X9, Super\n";
+    for (const name of ["data.csv", "data.cvs", "data.txt", "data.dat", "data"]) expect(isTableText(name, csv)).toBe(true);
+    expect(isTableText("db.json", csv)).toBe(false);
+    expect(isTableText("db", '{"nodes":{}}')).toBe(false);
+    expect(isTableText("db.export", "<graphml>")).toBe(false);
+    const table = toTable(parseCSV(csv, detectDelimiter(csv)), true);
+    expect(table).toEqual({ headers: ["Name", "Type", "Comment"], rows: [["A", "X1", "none"], ["B", "X0", ""], ["C", "X9", "Super"]], ids: undefined });
+  });
+});

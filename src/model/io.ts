@@ -107,6 +107,17 @@ export function fromGraphML(text: string): Graph {
 /** The database embedded in an HTML export (see html-export.ts), if any. */
 export const embeddedJSON = (html: string) => html.match(/<script type="application\/json" id="gridgraph-data">([\s\S]*?)<\/script>/)?.[1];
 
+/**
+ * Whether a file is a table (CSV/TSV) rather than a GridGraph export. Known extensions decide;
+ * otherwise the content does, so "data.cvs", "export.dat" or a file without extension still
+ * reaches the CSV import instead of failing as JSON.
+ */
+export function isTableText(fileName: string, text: string): boolean {
+  if (/\.(csv|cvs|tsv|tab|txt)$/i.test(fileName)) return true;
+  if (/\.(json|xml|graphml|html?)$/i.test(fileName)) return false;
+  return !/^[{[<]/.test(text.trimStart());
+}
+
 export function importText(fileName: string, text: string): Graph {
   if (/\.html?$/i.test(fileName) || /^\s*<!doctype html/i.test(text)) {
     const json = embeddedJSON(text);
