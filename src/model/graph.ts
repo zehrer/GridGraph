@@ -141,7 +141,12 @@ export function removeColumn(g: Graph, typeId: string, key: string) {
 
 /** Deletes a node; deleting a type also deletes its instances. Dangling references are cleaned up. */
 export function deleteNode(g: Graph, id: string) {
-  const doomed = new Set([id, ...(g.nodes[id]?.isType ? instancesOf(g, id).map((n) => n.id) : [])]);
+  deleteNodes(g, [id]);
+}
+
+/** Deletes several nodes in one pass over the graph. */
+export function deleteNodes(g: Graph, ids: string[]) {
+  const doomed = new Set(ids.flatMap((id) => [id, ...(g.nodes[id]?.isType ? instancesOf(g, id).map((n) => n.id) : [])]));
   for (const d of doomed) delete g.nodes[d];
   for (const [eid, e] of Object.entries(g.edges)) {
     if (doomed.has(e.source) || doomed.has(e.target)) delete g.edges[eid];
