@@ -52,3 +52,19 @@ describe("convert a column to a type", () => {
     expect(metaRelations(g).some((r) => r.from === "type_company" && r.to === t)).toBe(true);
   });
 });
+
+describe("convert a column to a type keeps commas", () => {
+  it("treats each cell as one value", async () => {
+    const { addInstance, addType, columnsOf, extractType, instancesOf, nodeName, upsertColumn } = await import("./graph");
+    const g = sampleGraph();
+    const t = addType(g, "Contacts");
+    upsertColumn(g, t, { key: "who", label: "Person", type: "text" });
+    for (const [n, who] of [["a", "Schmidt, Anna"], ["b", "Meier, Bob"], ["c", "schmidt, anna"]]) {
+      const id = addInstance(g, t, n);
+      g.nodes[id].props.who = who;
+    }
+    const p = extractType(g, t, columnsOf(g, t).find((c) => c.key === "who")!, "Person 2");
+    expect(instancesOf(g, p).map((n) => nodeName(g, n)).sort()).toEqual(["Meier, Bob", "Schmidt, Anna"]);
+    expect(instancesOf(g, t).every((n) => typeof n.props.who === "string")).toBe(true);
+  });
+});

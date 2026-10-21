@@ -284,12 +284,21 @@ export function convertColumn(g: Graph, typeId: string, col: Column, type: Colum
 
 /**
  * Turns a column's distinct values into rows of a new lookup type (named `label`) and the column
- * into a link to it – e.g. a "Country" text column into a Country sheet. Comma-separated values
- * become several links. Returns the new type's id.
+ * into a link to it – e.g. a "Country" text column into a Country sheet. Each cell is one value,
+ * commas included ("Schmidt, Anna"). Returns the new type's id.
  */
 export function extractType(g: Graph, typeId: string, col: Column, label: string): string {
   const target = addType(g, label);
-  convertColumn(g, typeId, col, "relation", target);
+  const byName = new Map<string, string>();
+  const next: Column = { ...col, type: "relation", targetTypeId: target, format: undefined };
+  for (const n of instancesOf(g, typeId)) {
+    const name = rawValue(g, col, n.props[col.key]).trim();
+    if (!name) continue;
+    const k = name.toLowerCase();
+    if (!byName.has(k)) byName.set(k, addInstance(g, target, name));
+    setProp(g, n.id, col.key, byName.get(k));
+  }
+  upsertColumn(g, typeId, next);
   return target;
 }
 
