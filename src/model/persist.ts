@@ -3,11 +3,14 @@ import { emptyGraph } from "./graph";
 import { fromJSON } from "./io";
 import { newDbInfo, useStore, type DbInfo } from "./store";
 import type { Graph } from "./types";
+import type { History } from "./history";
 
 // IndexedDB layout: an index of all databases, one entry per graph, and the last opened id.
 const INDEX = "databases";
 const LAST = "lastDatabase";
 const key = (id: string) => `db:${id}`;
+/** Version history of a database, kept apart so autosaving the graph does not rewrite it. */
+const histKey = (id: string) => `hist:${id}`;
 
 const listDbs = async () => (await get<DbInfo[]>(INDEX)) ?? [];
 
@@ -26,12 +29,21 @@ export async function initPersistence() {
     const lastId = await get<string>(LAST);
     const info = dbs.find((d) => d.id === lastId) ?? dbs[0];
     const graph = info && (await get<Graph>(key(info.id)));
-    useStore.getState().open(graph ?? emptyGraph(), graph ? info : newDbInfo());
+    const history = graph ? await get<History>(histKey(info.id)) : undefined;
+    useStore.getState().open(graph ?? emptyGraph(), graph ? info : newDbInfo(), false, history);
+    if (!history) historyChanged = true;
     useStore.setState({ dbs });
   } catch (e) {
     useStore.setState({ saveError: String(e) });
   }
-  useStore.subscribe((s, prev) => s.revision !== prev.revision && schedule());
+  useStore.subscribe((s, prev) => {
+    if (s.history !== prev.history) {
+      historyChanged = true;
+      // Opening another database brings its own history; it is saved with that database's next change.
+      if (s.db.id === prev.db.id) schedule();
+    }
+    if (s.revision !== prev.revision) schedule();
+  });
   receiveFromExport();
 }
 
@@ -59,6 +71,7 @@ export function receiveFromExport() {
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let pending = false;
+let historyChanged = false;
 
 function schedule() {
   pending = true;
@@ -71,10 +84,14 @@ export async function flush() {
   if (!pending) return;
   pending = false;
   clearTimeout(timer);
-  const { graph, db } = useStore.getState();
+  const { graph, db, history } = useStore.getState();
   const info = { ...db, updatedAt: Date.now() };
   try {
     await set(key(info.id), graph);
+    if (historyChanged) {
+      historyChanged = false;
+      await set(histKey(info.id), history);
+    }
     const dbs = [info, ...(await listDbs()).filter((d) => d.id !== info.id)];
     await set(INDEX, dbs);
     await set(LAST, info.id);
@@ -95,7 +112,9 @@ export async function openDatabase(id: string) {
   const info = (await listDbs()).find((d) => d.id === id);
   const graph = await get<Graph>(key(id));
   if (!info || !graph) return;
-  useStore.getState().open(graph, info);
+  const history = await get<History>(histKey(id));
+  useStore.getState().open(graph, info, false, history);
+  if (!history) historyChanged = true;
   await set(LAST, id);
 }
 
@@ -103,6 +122,7 @@ export async function openDatabase(id: string) {
 export async function deleteDatabase(id: string) {
   const dbs = (await listDbs()).filter((d) => d.id !== id);
   await del(key(id));
+  await del(histKey(id));
   await set(INDEX, dbs);
   useStore.setState({ dbs });
   if (useStore.getState().db.id === id) {

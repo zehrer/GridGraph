@@ -7,6 +7,8 @@ import { openDatabase } from "../model/persist";
 import { Settings } from "./Settings";
 import { viewItems } from "./ViewSelector";
 import { About } from "./About";
+import { CheckIn, HistoryDialog } from "./Versions";
+import { openChanges } from "../model/history";
 import { DATE_FORMATS, NUMBER_FORMATS, displayDate, displayNumber } from "../model/locale";
 import type { Column } from "../model/types";
 
@@ -50,6 +52,7 @@ export function Header() {
   const [open, setOpen] = useState<number | null>(null);
   const [settings, setSettings] = useState(false);
   const [about, setAbout] = useState(false);
+  const [versions, setVersions] = useState<"checkin" | "history" | null>(null);
   const s = useStore();
   const { sel } = s;
   const m = A.currentSheet();
@@ -59,6 +62,11 @@ export function Header() {
   const sheet = s.view === "sheet";
   const hiddenSheets = typesOf(s.graph).filter((t) => t.hiddenSheet);
   const colSelected = sel.col === 0 || !!m.columns[sel.col - 1];
+  const changes = openChanges(s.history.head, s.graph);
+  const version = s.history.commits.at(-1)?.no ?? 1;
+  const selNode = m.rows[sel.row - 1];
+  const selKey = sel.col === 0 ? undefined : m.columns[sel.col - 1]?.key;
+  const selChanged = !!selNode && changes.some((c) => c.id === selNode.id && (selKey === undefined ? true : c.k === "cell" && c.key === selKey) || (c.k === "add" && c.id === selNode.id));
 
   const menus: { label: string; items: MenuItem[] }[] = [
     {
@@ -67,6 +75,10 @@ export function Header() {
         { label: "New database", action: A.newDatabase },
         { label: "Import (JSON, GraphML, HTML, CSV)…", shortcut: `${MOD}O`, action: () => A.importFile() },
         { label: "Import CSV / TSV as sheet…", action: A.importCSV },
+        "-",
+        { label: `Check in version ${version + 1}…`, disabled: !changes.length, action: () => setVersions("checkin") },
+        { label: "History…", action: () => setVersions("history") },
+        "-",
         { label: "Open sample: Projects & people", action: A.loadSample },
         { label: "Open sample: Le Monde's 100 books", action: A.loadLeMondeSample },
         "-",
@@ -96,6 +108,9 @@ export function Header() {
         "-",
         { label: "Delete row(s)", disabled: !hasRow, action: A.deleteRows },
         { label: "Delete column", disabled: !hasCol, action: () => A.deleteColumn(sel.col) },
+        "-",
+        { label: sel.col === 0 ? "Revert row to checked-in version" : "Revert cell to checked-in version", disabled: !sheet || !selChanged, action: A.revertSelection },
+        { label: "Discard all changes since check-in…", disabled: !changes.length, action: A.discardChanges },
       ],
     },
     {
@@ -196,9 +211,18 @@ export function Header() {
           ))}
         </nav>
       </div>
+      <button
+        className={`version-status${changes.length ? " open" : ""}`}
+        title={changes.length ? `Not checked in: ${changes.length} change${changes.length > 1 ? "s" : ""} since version ${version} – click to check in` : `Version ${version} – everything is checked in. Click for the history.`}
+        onClick={() => setVersions(changes.length ? "checkin" : "history")}
+      >
+        v{version}{changes.length ? ` · ${changes.length} change${changes.length > 1 ? "s" : ""}` : ""}
+      </button>
       <div className="save-status">{s.saveError ? "⚠︎ Not saved" : s.savedAt ? `Saved ${s.savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</div>
       {settings && <Settings onClose={() => setSettings(false)} />}
       {about && <About onClose={() => setAbout(false)} />}
+      {versions === "checkin" && <CheckIn onClose={() => setVersions(null)} />}
+      {versions === "history" && <HistoryDialog onClose={() => setVersions(null)} />}
     </header>
   );
 }

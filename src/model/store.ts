@@ -3,6 +3,7 @@ import { addType, emptyGraph, newId, normalize, typesOf } from "./graph";
 import { browserLocale, setLocale } from "./locale";
 import type { SelectionStat } from "./summary";
 import type { Graph } from "./types";
+import { startHistory, type History } from "./history";
 
 /** A database saved in this browser. */
 export interface DbInfo { id: string; name: string; updatedAt: number }
@@ -46,6 +47,9 @@ interface State {
   /** Bumped by every change that should be saved. */
   revision: number;
   graph: Graph;
+  /** Checked-in versions; the graph's differences to `history.head` are the open changes. */
+  history: History;
+  setHistory: (h: History) => void;
   past: Graph[];
   future: Graph[];
   view: View;
@@ -74,8 +78,8 @@ interface State {
   edit: (fn: (g: Graph) => void) => void;
   undo: () => void;
   redo: () => void;
-  /** Switches to another database (clears undo history); `dirty` saves it right away. */
-  open: (g: Graph, db: DbInfo, dirty?: boolean) => void;
+  /** Switches to another database (clears undo history); `dirty` saves it right away. Without a version history one starts here. */
+  open: (g: Graph, db: DbInfo, dirty?: boolean, history?: History) => void;
   rename: (name: string) => void;
   setView: (view: View, focusNodeId?: string | null) => void;
   setActiveType: (id: string) => void;
@@ -110,6 +114,8 @@ export const useStore = create<State>()((set, get) => {
     dbs: [],
     revision: 0,
     graph: initial,
+    history: startHistory(initial),
+    setHistory: (history) => set({ history }),
     past: [],
     future: [],
     view: "sheet",
@@ -143,12 +149,14 @@ export const useStore = create<State>()((set, get) => {
       const [next, ...rest] = future;
       if (next) set({ graph: next, past: [...past, graph], future: rest, activeTypeId: settle(next, activeTypeId), revision: get().revision + 1 });
     },
-    open: (g, db, dirty = false) =>
+    open: (g, db, dirty = false, history) => {
+      const graph = normalize(g);
       set({
-        graph: normalize(g), db, past: [], future: [], view: "sheet", activeTypeId: settle(g, ""),
+        graph, history: history ?? startHistory(graph), db, past: [], future: [], view: "sheet", activeTypeId: settle(g, ""),
         sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "", hiddenTypes: [], shownTypes: [], back: null,
         savedAt: dirty ? null : new Date(db.updatedAt), revision: get().revision + (dirty ? 1 : 0),
-      }),
+      });
+    },
     rename: (name) => set({ db: { ...get().db, name }, revision: get().revision + 1 }),
     setView: (view, focusNodeId = null) => set({ view, focusNodeId }),
     setActiveType: (activeTypeId) => set({ activeTypeId, sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "" }),

@@ -1,6 +1,7 @@
 import { addInstance, addType, columnsOf, convertColumn, deleteNode, extractType, renumber, typesOf, emptyGraph, guessType, instancesOf, moveColumn, newId, nodeName, parseValue, patchColumn, rawValue, removeColumn, setProp, upsertColumn } from "../model/graph";
 import { guessDateFormat, parseNumber } from "../model/locale";
 import { cellValue, numberFormat, renameReference, shownColumn } from "../model/formula";
+import { openChanges, revert, summarize } from "../model/history";
 import { download, fromJSON, importText, isTableText, toGraphML, toJSON } from "../model/io";
 import { toHTML as toStandaloneHTML } from "../model/html-export";
 import { decodeText } from "../model/csv";
@@ -637,4 +638,25 @@ export function deleteCurrentDatabase() {
   const { db, dbs } = useStore.getState();
   if (!dbs.some((d) => d.id === db.id)) return openNew(emptyGraph());
   if (confirm(`Permanently delete database "${db.name}" from this browser?`)) deleteDatabase(db.id);
+}
+
+// --- Versions ---
+
+/** Edit → Discard changes: back to the last checked-in version (can be undone). */
+export function discardChanges() {
+  const { graph, history, edit } = useStore.getState();
+  const n = openChanges(history.head, graph).length;
+  if (!n || !confirm(`Discard ${summarize(openChanges(history.head, graph))} since version ${history.commits.at(-1)?.no}?`)) return;
+  edit((g) => revert(g, history.head));
+}
+
+/** Edit → Revert cell / row: the selected cell (or, on the ID, the row) gets its checked-in state back. */
+export function revertSelection() {
+  const s = useStore.getState();
+  const m = currentSheet();
+  const node = m.rows[s.sel.row - 1];
+  if (!node) return;
+  const key = s.sel.col === 0 ? undefined : m.columns[s.sel.col - 1]?.key;
+  if (s.sel.col !== 0 && !key) return;
+  s.edit((g) => revert(g, s.history.head, { id: node.id, key }));
 }

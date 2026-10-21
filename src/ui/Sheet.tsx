@@ -4,11 +4,12 @@ import { displayValue, linkIds, nodeColor, nodeName } from "../model/graph";
 import { parseClipboard, toHTML, toTSV } from "../model/clipboard";
 import { SUMMARIES, summarize } from "../model/summary";
 import { shownColumn } from "../model/formula";
-import type { Column, Graph, GraphNode, QuickFilter } from "../model/types";
+import type { Column, Graph, GraphNode, QuickFilter, Value } from "../model/types";
 import * as A from "./actions";
 import { MenuList, type MenuItem } from "./Menu";
 import { FilterPanel } from "./FilterPanel";
 import { isActive } from "../model/filter";
+import { marks, openChanges } from "../model/history";
 
 const TYPE_ICON: Partial<Record<Column["type"], string>> = { number: "#", date: "◷", boolean: "☑", relation: "↗", formula: "ƒ" };
 const MOVES: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
@@ -20,7 +21,9 @@ type CellHandler = (e: MouseEvent, cell: Cell) => void;
 type Popup = { x: number; y: number; up?: boolean; items: MenuItem[] };
 
 export function Sheet() {
-  const { graph, activeTypeId, sort, filter, sel, anchor, select, prefs } = useStore();
+  const { graph, activeTypeId, sort, filter, sel, anchor, select, prefs, history } = useStore();
+  // Cells and rows changed since the last check-in.
+  const changed = useMemo(() => marks(openChanges(history.head, graph)), [history.head, graph]);
   const m = useMemo(() => A.sheetModel(graph, activeTypeId, { sort, filter }), [graph, activeTypeId, sort, filter]);
   const [edit, setEditState] = useState<Edit | null>(null);
   const editRef = useRef<Edit | null>(null);
@@ -356,6 +359,8 @@ export function Sheet() {
   const rowProps = (row: number) => ({
     row,
     node: m.rows[row - 1],
+    isNew: !!m.rows[row - 1] && changed.added.has(m.rows[row - 1].id),
+    was: m.rows[row - 1] && changed.cells.get(m.rows[row - 1].id),
     columns: m.columns,
     nCols,
     graph,
@@ -429,6 +434,10 @@ export function Sheet() {
 interface RowProps {
   row: number;
   node?: GraphNode;
+  /** Added since the last check-in. */
+  isNew: boolean;
+  /** Checked-in values of the cells changed since, by column key. */
+  was?: Map<string, Value | undefined>;
   columns: Column[];
   nCols: number;
   graph: Graph;
@@ -442,14 +451,16 @@ interface RowProps {
 }
 
 /** One instance row; column 0 is its ID, which also marks the selected rows (but selects like any cell). */
-const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, rangeCols, editCol, editText, editor, onCell }: RowProps) {
+const Row = memo(function Row({ row, node, isNew, was, columns, nCols, graph, selCol, rangeCols, editCol, editText, editor, onCell }: RowProps) {
   const [c0, c1] = rangeCols ? rangeCols.split(":").map(Number) : [-1, -1];
   return (
     <tr>
       {Array.from({ length: nCols }, (_, col) => {
         const column = columns[col - 1];
         const cell = { row, col };
+        const changedCell = (col === 0 && isNew) || (!!column && !!was?.has(column.key));
         const cls = [
+          changedCell && "changed",
           col === 0 && "id",
           col === 0 && (selCol >= 0 || c0 >= 0) && "hl",
           col === selCol && "sel",
@@ -465,6 +476,7 @@ const Row = memo(function Row({ row, node, columns, nCols, graph, selCol, rangeC
             onMouseDown={(e) => onCell(e, cell)}
             onMouseEnter={(e) => onCell(e, cell)}
             onDoubleClick={(e) => onCell(e, cell)}
+            title={!changedCell ? undefined : col === 0 ? "New row – not checked in yet" : `Not checked in. Checked-in value: ${displayValue(graph, column!, was!.get(column!.key)) || "(empty)"}`}
           >
             {col === editCol ? (editor || editText) : <CellContent col={col} node={node} column={column} graph={graph} />}
           </td>
