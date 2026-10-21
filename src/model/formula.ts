@@ -251,10 +251,29 @@ const today = () => {
 
 const nums = (vs: RV[]) => items(vs).map(toNum);
 
+const regexes = new Map<string, RegExp>();
+function regex(src: string): RegExp {
+  let re = regexes.get(src);
+  if (!re) {
+    try {
+      re = new RegExp(src);
+    } catch {
+      return fail(`Invalid pattern "${src}"`);
+    }
+    regexes.set(src, re);
+  }
+  return re;
+}
+
 function call(name: string, args: Ast[], ctx: Ctx, node: GraphNode): RV {
   const ev = (i: number) => (args[i] ? evaluate(args[i], ctx, node) : null);
   const all = () => args.map((_, i) => ev(i));
   const need = (n: number) => args.length < n && fail(`${name} needs ${n} argument${n > 1 ? "s" : ""}`);
+  const txt = (i: number) => toText(ev(i), ctx.g);
+  const count = (i: number) => {
+    const n = Math.trunc(toNum(ev(i)));
+    return n < 0 ? fail(`${name}: a count cannot be negative`) : n;
+  };
   switch (name) {
     case "IF":
       need(2);
@@ -320,6 +339,57 @@ function call(name: string, args: Ast[], ctx: Ctx, node: GraphNode): RV {
     }
     case "CONCAT":
       return all().map((v) => toText(v, ctx.g)).join("");
+    case "FIND":
+    case "SEARCH": {
+      // Position (1-based) of a text, from an optional start; SEARCH ignores case.
+      need(2);
+      const [what, text] = [txt(0), txt(1)];
+      const from = args[2] ? Math.max(1, Math.trunc(toNum(ev(2)))) - 1 : 0;
+      const at = name === "FIND" ? text.indexOf(what, from) : text.toLowerCase().indexOf(what.toLowerCase(), from);
+      return at < 0 ? fail(`${name}: "${what}" not found`) : at + 1;
+    }
+    case "LEFT":
+    case "RIGHT": {
+      need(1);
+      const [text, n] = [txt(0), args[1] ? count(1) : 1];
+      return name === "LEFT" ? text.slice(0, n) : n ? text.slice(-n) : "";
+    }
+    case "MID": {
+      need(3);
+      const start = Math.max(1, Math.trunc(toNum(ev(1))));
+      return txt(0).slice(start - 1, start - 1 + count(2));
+    }
+    case "SUBSTITUTE": {
+      // Replaces every occurrence, or only the n-th one.
+      need(3);
+      const [text, old, by] = [txt(0), txt(1), txt(2)];
+      if (!old) return text;
+      if (!args[3]) return text.split(old).join(by);
+      const n = count(3);
+      let at = -1;
+      for (let i = 0; i < n; i++) if ((at = text.indexOf(old, at + 1)) < 0) return text;
+      return text.slice(0, at) + by + text.slice(at + old.length);
+    }
+    case "TRIM":
+      need(1);
+      return txt(0).trim().replace(/\s+/g, " ");
+    case "REGEXEXTRACT": {
+      // The first group of the match if the pattern has one, else the whole match; empty without a match.
+      need(2);
+      const m = txt(0).match(regex(txt(1)));
+      return m ? (m[1] ?? m[0]) : null;
+    }
+    case "REGEXMATCH":
+      need(2);
+      return regex(txt(1)).test(txt(0));
+    case "IFERROR":
+      need(2);
+      try {
+        return ev(0);
+      } catch (e) {
+        if (e instanceof FormulaError) return ev(1);
+        throw e;
+      }
     default:
       return fail(`Unknown function ${name}`);
   }
@@ -503,4 +573,4 @@ export function renameReference(formula: string, from: string, to: string): stri
   return formula.replace(new RegExp(`\\[\\s*${esc}\\s*\\]`, "gi"), `[${to}]`);
 }
 
-export const FUNCTIONS = "IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT";
+export const FUNCTIONS = "IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT, FIND, SEARCH, LEFT, RIGHT, MID, SUBSTITUTE, TRIM, REGEXEXTRACT, REGEXMATCH, IFERROR";

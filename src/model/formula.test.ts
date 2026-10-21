@@ -93,4 +93,24 @@ describe("formulas", () => {
     const perLead = h.nodes.type_project.columns!.find((c) => c.key === "perLead")!;
     expect(shownColumn(h, h.nodes.proj_alpha, perLead).col.format).toBe("EUR");
   });
+
+  it("cuts text apart, e.g. the email out of \"Name, First (mail)\"", () => {
+    const h = sampleGraph();
+    h.nodes.type_person.columns!.push({ key: "contact", label: "Contact", type: "text" });
+    h.nodes.person_alice.props.contact = "Schmidt,  Alice (alice.schmidt@example.com)";
+    const t = (formula: string) => computeFormula(h, h.nodes.person_alice, formula);
+    expect(t('REGEXEXTRACT([Contact]; "\\(([^)]+)\\)")').value).toBe("alice.schmidt@example.com");
+    expect(t('MID([Contact]; FIND("("; [Contact]) + 1; FIND(")"; [Contact]) - FIND("("; [Contact]) - 1)').value).toBe("alice.schmidt@example.com");
+    expect(t('TRIM(LEFT([Contact]; FIND(","; [Contact]) - 1))').value).toBe("Schmidt");
+    expect(t('TRIM(LEFT(MID([Contact]; FIND(","; [Contact]) + 1; 99); SEARCH("(", MID([Contact]; FIND(","; [Contact]) + 1; 99)) - 1))').value).toBe("Alice");
+    expect(t('REGEXMATCH([Contact]; "@example\\.com")').value).toBe(true);
+    expect(t('REGEXEXTRACT([Name]; "\\d+")')).toEqual({ type: "text" });
+    expect(t('RIGHT("abcdef"; 2) & LEFT("abc") & MID("abcdef", 3, 2)').value).toBe("efacd");
+    expect(t('SUBSTITUTE("a-b-c"; "-"; "/")').value).toBe("a/b/c");
+    expect(t('SUBSTITUTE("a-b-c"; "-"; "/"; 2)').value).toBe("a-b/c");
+    expect(t('SEARCH("ALICE"; [Contact])').value).toBe(11);
+    expect(t('FIND("ALICE"; [Contact])').error).toBe('FIND: "ALICE" not found');
+    expect(t('IFERROR(FIND("#"; [Contact]); 0)').value).toBe(0);
+    expect(t('REGEXMATCH([Contact]; "(")').error).toMatch(/^Invalid pattern/);
+  });
 });

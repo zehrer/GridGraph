@@ -95,7 +95,7 @@ GridGraph is a local, schemaless graph database that feels like a spreadsheet. P
 | FX-1 | A **formula column** computes its value per row from an expression; cells are read-only and results are computed when shown, never stored (only the formula is saved and exported). | Done |
 | FX-2 | Columns are referenced by name in brackets: `[Birthday]`. Renaming a column updates formulas that refer to it. | Done |
 | FX-3 | Operators `+ − * /`, `&` (text), `= <> < > <= >=`; date arithmetic (date − date = days, date ± days = date). | Done |
-| FX-4 | Functions: IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT (English names). Arguments are separated by `,` or `;`; with `;` numbers may use a decimal comma. | Done |
+| FX-4 | Functions: IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT, FIND, SEARCH, LEFT, RIGHT, MID, SUBSTITUTE, TRIM, REGEXEXTRACT, REGEXMATCH, IFERROR (English names). Arguments are separated by `,` or `;`; with `;` numbers may use a decimal comma. | Done |
 | FX-5 | **Following links**: `[Employer].[City]`, `SUM([Client].[Employees])`, `COUNT([Lead])`; chains like `[Lead].[Employer].[City]` work; a result that is a set of links shows as link chips. | Done |
 | FX-6 | Errors (unknown column, not a number, self-reference …) show `#ERROR` in the cell with the reason as a tooltip. | Done |
 | FX-7 | Formula editor (Insert → Formula column…, Format → Formula…, column menu, or the toolbar's type list): column shortcuts, live preview of the first rows, error message. | Done |

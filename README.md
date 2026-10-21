@@ -50,7 +50,7 @@ IF([Age] >= 40, "senior", "junior")
 SUM([Client].[Employees])
 ```
 
-Columns are referenced by name; `.[Column]` follows a link. Functions: IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT.
+Columns are referenced by name; `.[Column]` follows a link. Functions: IF, AND, OR, NOT, ROUND, ABS, SUM, AVERAGE, MIN, MAX, COUNT, TODAY, YEAR, MONTH, DAY, DATEDIF, AGE, LEN, UPPER, LOWER, CONCAT, FIND, SEARCH, LEFT, RIGHT, MID, SUBSTITUTE, TRIM, REGEXEXTRACT, REGEXMATCH, IFERROR. Example: `REGEXEXTRACT([Contact]; "\(([^)]+)\)")` takes the email out of "Doe, Jane (jane.doe@example.com)".
 
 **File menu**: new database, saved databases in this browser, import/export as JSON or GraphML (Gephi, yEd, Cytoscape), **import CSV/TSV** as a new sheet or as an **update of an existing sheet** (rows matched by ID or name; views, formats, formulas and links stay; separator and encoding detected automatically), two sample databases (Projects & people, Le Monde’s 100 books), and **Export as HTML** – a single file anyone can view in a browser, with an “Open in GridGraph” button to edit the data again.
 
