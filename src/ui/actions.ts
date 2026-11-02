@@ -2,6 +2,7 @@ import { addInstance, addType, columnsOf, convertColumn, deleteNode, extractType
 import { guessDateFormat, parseNumber } from "../model/locale";
 import { cellValue, numberFormat, renameReference, shownColumn } from "../model/formula";
 import { openChanges, revert, summarize } from "../model/history";
+import { readXlsx } from "../model/xlsx";
 import { download, fromJSON, importText, isTableText, toGraphML, toJSON } from "../model/io";
 import { toHTML as toStandaloneHTML } from "../model/html-export";
 import { decodeText } from "../model/csv";
@@ -605,7 +606,7 @@ export const exportHTML = () => {
  * File → Import: JSON, GraphML or HTML exports open as a new database; CSV/TSV files go to the
  * CSV dialog and become a new sheet of the open database.
  */
-export function importFile(accept = ".json,.xml,.graphml,.html,.htm,.csv,.cvs,.tsv,.tab,.txt,.dat") {
+export function importFile(accept = ".json,.xml,.graphml,.html,.htm,.csv,.cvs,.tsv,.tab,.txt,.dat,.xlsx,.xls") {
   const input = document.createElement("input");
   input.type = "file";
   input.accept = accept;
@@ -613,7 +614,13 @@ export function importFile(accept = ".json,.xml,.graphml,.html,.htm,.csv,.cvs,.t
     const file = input.files?.[0];
     if (!file) return;
     try {
-      const { text, encoding } = decodeText(await file.arrayBuffer());
+      const buffer = await file.arrayBuffer();
+      if (/\.xlsx$/i.test(file.name) || file.type.includes("spreadsheetml")) {
+        useStore.setState({ csvImport: { fileName: file.name, text: "", encoding: "", sheets: await readXlsx(buffer) } });
+        return;
+      }
+      if (/\.xls$/i.test(file.name)) throw new Error("Old Excel files (.xls) cannot be read. Save the file as .xlsx (Excel workbook) or CSV and import it again.");
+      const { text, encoding } = decodeText(buffer);
       if (file.type === "text/csv" || isTableText(file.name, text)) useStore.setState({ csvImport: { fileName: file.name, text, encoding } });
       else await openNew(importText(file.name, text), file.name.replace(/\.[^.]+$/, ""));
     } catch (e) {
@@ -623,7 +630,7 @@ export function importFile(accept = ".json,.xml,.graphml,.html,.htm,.csv,.cvs,.t
   input.click();
 }
 
-export const importCSV = () => importFile(".csv,.cvs,.tsv,.tab,.txt,.dat,text/csv,text/tab-separated-values,text/plain");
+export const importCSV = () => importFile(".csv,.cvs,.tsv,.tab,.txt,.dat,.xlsx,.xls,text/csv,text/tab-separated-values,text/plain");
 
 export const newDatabase = () => openNew(emptyGraph());
 export const loadSample = () => openNew(sampleGraph(), "Sample data");

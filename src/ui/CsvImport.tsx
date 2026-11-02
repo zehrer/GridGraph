@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../model/store";
 import { deleteNode, instancesOf, typesOf } from "../model/graph";
+import type { XlsxSheet } from "../model/xlsx";
 import { DELIMITERS, detectDelimiter, importTable, looksNumeric, matchSheet, parseCSV, toTable, updateKeys, updateTable, type Delimiter } from "../model/csv";
 
-/** Preview and options for a CSV/TSV file before it becomes a new sheet or updates an existing one. */
+/** Preview and options for a CSV/TSV or Excel file before it becomes a new sheet or updates an existing one. */
 export function CsvImport() {
   const file = useStore((s) => s.csvImport);
-  return file ? <Dialog key={file.fileName + file.text.length} {...file} /> : null;
+  return file ? <Dialog key={`${file.fileName}:${file.text.length}:${file.sheets?.map((s) => s.rows.length).join() ?? ""}`} {...file} /> : null;
 }
 
-function Dialog({ fileName, text, encoding }: { fileName: string; text: string; encoding: string }) {
+function Dialog({ fileName, text, encoding, sheets }: { fileName: string; text: string; encoding: string; sheets?: XlsxSheet[] }) {
+  // Excel: the first sheet with data, choosable when the workbook has several.
+  const [sheetNo, setSheetNo] = useState(() => Math.max(0, sheets?.findIndex((s) => s.rows.length) ?? 0));
   const detected = useMemo(() => detectDelimiter(text), [text]);
   const [delimiter, setDelimiter] = useState<Delimiter>(detected);
   const [header, setHeader] = useState(true);
   const base = fileName.replace(/\.[^.]+$/, "") || "Imported";
-  const table = useMemo(() => toTable(parseCSV(text, delimiter), header), [text, delimiter, header]);
+  const table = useMemo(() => toTable(sheets ? (sheets[sheetNo]?.rows ?? []) : parseCSV(text, delimiter), header), [sheets, sheetNo, text, delimiter, header]);
   const graph = useStore((s) => s.graph);
   const types = typesOf(graph);
   // A file that looks like a new state of an existing sheet updates it by default.
@@ -108,20 +111,31 @@ function Dialog({ fileName, text, encoding }: { fileName: string; text: string; 
             {template && <p className="hint">Columns with the same heading take over type, format and links; formula columns, filters and filter views are copied.</p>}
           </>
         )}
-        <label>
-          <span>Separator</span>
-          <select value={delimiter} onChange={(e) => setDelimiter(e.target.value as Delimiter)}>
-            {DELIMITERS.map(([d, l]) => (
-              <option key={l} value={d}>{l}{d === detected ? " (detected)" : ""}</option>
-            ))}
-          </select>
-        </label>
+        {sheets ? (
+          sheets.length > 1 && (
+            <label>
+              <span>Excel sheet</span>
+              <select value={sheetNo} onChange={(e) => setSheetNo(Number(e.target.value))}>
+                {sheets.map((s, i) => <option key={i} value={i}>{s.name}{s.rows.length ? "" : " (empty)"}</option>)}
+              </select>
+            </label>
+          )
+        ) : (
+          <label>
+            <span>Separator</span>
+            <select value={delimiter} onChange={(e) => setDelimiter(e.target.value as Delimiter)}>
+              {DELIMITERS.map(([d, l]) => (
+                <option key={l} value={d}>{l}{d === detected ? " (detected)" : ""}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="check">
           <input type="checkbox" checked={header} onChange={(e) => setHeader(e.target.checked)} />
           <span>First row contains the column names</span>
         </label>
         <p className="hint">
-          {table.rows.length} rows · {table.headers.length} columns · {label(delimiter)} · {encoding}
+          {table.rows.length} rows · {table.headers.length} columns · {sheets ? "Excel" : `${label(delimiter)} · ${encoding}`}
           {table.ids ? " · the ID column is kept as row IDs" : ""}
         </p>
         <div className="preview-scroll">

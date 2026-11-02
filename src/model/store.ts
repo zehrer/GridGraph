@@ -4,6 +4,7 @@ import { browserLocale, setLocale } from "./locale";
 import type { SelectionStat } from "./summary";
 import type { Graph } from "./types";
 import { startHistory, type History } from "./history";
+import type { XlsxSheet } from "./xlsx";
 
 /** A database saved in this browser. */
 export interface DbInfo { id: string; name: string; updatedAt: number }
@@ -63,7 +64,8 @@ interface State {
   /** Hidden sheets the user chose to show in the graph anyway (session). */
   shownTypes: string[];
   /** A CSV/TSV file waiting in the import dialog. */
-  csvImport: { fileName: string; text: string; encoding: string } | null;
+  /** `sheets` for an Excel workbook (rows of cell texts), `text` for CSV/TSV. */
+  csvImport: { fileName: string; text: string; encoding: string; sheets?: XlsxSheet[] } | null;
   /** Key of the column whose formula is being edited (active sheet). */
   formulaEditor: string | null;
   /** Where "Back" returns to after following a link. */
@@ -99,6 +101,7 @@ function settle(g: Graph, activeTypeId: string) {
 
 export const useStore = create<State>()((set, get) => {
   const initial = emptyGraph();
+  const initialType = settle(initial, "");
   return {
     prefs: applyNotation(loadPrefs()),
     setPrefs: (p) => {
@@ -119,7 +122,7 @@ export const useStore = create<State>()((set, get) => {
     past: [],
     future: [],
     view: "sheet",
-    activeTypeId: settle(initial, ""),
+    activeTypeId: initialType,
     sel: { row: 1, col: 0 },
     anchor: { row: 1, col: 0 },
     focusNodeId: null,
@@ -151,8 +154,10 @@ export const useStore = create<State>()((set, get) => {
     },
     open: (g, db, dirty = false, history) => {
       const graph = normalize(g);
+      // The sheet a database needs is added before the history starts, so it is not an open change.
+      const activeTypeId = settle(graph, "");
       set({
-        graph, history: history ?? startHistory(graph), db, past: [], future: [], view: "sheet", activeTypeId: settle(g, ""),
+        graph, history: history ?? startHistory(graph), db, activeTypeId, past: [], future: [], view: "sheet", 
         sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "", hiddenTypes: [], shownTypes: [], back: null,
         savedAt: dirty ? null : new Date(db.updatedAt), revision: get().revision + (dirty ? 1 : 0),
       });

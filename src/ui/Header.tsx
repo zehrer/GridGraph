@@ -73,8 +73,8 @@ export function Header() {
       label: "File",
       items: [
         { label: "New database", action: A.newDatabase },
-        { label: "Import (JSON, GraphML, HTML, CSV)…", shortcut: `${MOD}O`, action: () => A.importFile() },
-        { label: "Import CSV / TSV as sheet…", action: A.importCSV },
+        { label: "Import (JSON, GraphML, HTML, CSV, Excel)…", shortcut: `${MOD}O`, action: () => A.importFile() },
+        { label: "Import CSV / Excel as sheet…", action: A.importCSV },
         "-",
         { label: `Check in version ${version + 1}…`, disabled: !changes.length, action: () => setVersions("checkin") },
         { label: "History…", action: () => setVersions("history") },
