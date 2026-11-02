@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addInstance, columnsOf, convertColumn, deleteNode, patchColumn, setProp, upsertColumn } from "./graph";
-import { checkIn, describe as describeChange, diff, marks, revert, startHistory, summarize } from "./history";
+import { checkIn, describe as describeChange, diff, marks, noHistory, openChanges, revert, startHistory, summarize, type History } from "./history";
 import { sampleGraph } from "./sample";
 
 describe("version history", () => {
@@ -40,13 +40,23 @@ describe("version history", () => {
 
   it("checks in the open changes as the next version", () => {
     const g = sampleGraph();
-    let h = startHistory(g);
+    let h: History = startHistory(g);
     expect(checkIn(h, g, "nothing")).toBe(h);
     setProp(g, "person_alice", "age", 40);
     h = checkIn(h, g, "  Birthday  ");
     expect(h.commits.at(-1)).toMatchObject({ no: 2, kind: "manual", message: "Birthday" });
     expect(summarize(h.commits.at(-1)!.changes)).toBe("1 cell");
-    expect(diff(h.head, g)).toEqual([]);
+    expect(diff(h.head!, g)).toEqual([]);
+  });
+
+  it("is not versioned until the first check-in", () => {
+    const g = sampleGraph();
+    const empty = noHistory();
+    setProp(g, "person_alice", "age", 40);
+    expect(openChanges(empty.head, g)).toEqual([]);
+    const h = checkIn(empty, g, " First ");
+    expect(h.commits).toMatchObject([{ no: 1, kind: "initial", message: "First", changes: [] }]);
+    expect(diff(h.head!, g)).toEqual([]);
   });
 
   it("discards all changes, keeping display settings", () => {

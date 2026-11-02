@@ -177,10 +177,10 @@ Git-like history of a database. Phase 1 of 4: (1) check-in, (2) imports as versi
 | ID | Requirement | Status |
 |---|---|---|
 | VC-1 | Every edit is an **open change** until it is checked in; the header shows "v3 · 5 changes" (orange while changes are open). Only **data and column definitions** are versioned (cells, rows, sheets, column name/type/link target/formula, name column, IDs, free edges); widths, formats, column order, filters and views are not. | Done |
-| VC-2 | **Check in** (File → Check in version n…, or the header button): lists the open changes readably (e.g. `Person "Alice" · Age: 32 → 33`) and records them with an optional note as the next version. | Done |
+| VC-2 | **Check in** (Versions → Check in version n…, or the header button): lists the open changes readably (e.g. `Person "Alice" · Age: 32 → 33`) and records them with an optional note as the next version. | Done |
 | VC-3 | Cells changed since the check-in are marked (orange edge); the tooltip shows the checked-in value; new rows are marked on the ID. | Done |
-| VC-4 | **Discard**: Edit → "Revert cell / row to checked-in version" and "Discard all changes since check-in…" restore the checked-in data, keep display settings, and can be undone. | Done |
-| VC-5 | **History** (File → History…): versions newest first with date, note and counts; a click lists the changes. A database without history starts one (version 1) when it is opened. | Done |
+| VC-4 | **Discard**: Versions → "Revert cell / row to checked-in version" and "Discard all changes since check-in…" restore the checked-in data, keep display settings, and can be undone. | Done |
+| VC-5 | **History** (Versions → History…): versions newest first with date, note and counts; a click lists the changes. A database is **not versioned until its first check-in** (Versions → Start versioning): until then nothing is marked as changed and the header shows no version. Autosave works the same either way; versions are created only by check-ins. | Done |
 | VC-6 | The history is saved with the database in this browser (separate IndexedDB entry). | Done |
 | VC-7 | JSON export/import carries the history. | Planned |
 | VC-8 | CSV update as a version: automatic check-in of open changes before the import, import versions with source, rows not in the file marked as removed, status columns (new / changed / removed). | Planned |
@@ -217,6 +217,7 @@ Git-like history of a database. Phase 1 of 4: (1) check-in, (2) imports as versi
 | 2026-10-20 | Lookup types are not created automatically on CSV import (a guess would often be wrong, e.g. names or free text); the user converts a column explicitly with "Convert column to type". |
 | 2026-10-20 | A CSV re-import updates the existing sheet in place (matched by key) rather than replacing it, so row identity, links, views and formats survive a new data state; versions are separate sheets that take their views from the earlier one. |
 | 2026-10-21 | Versioning follows git: open changes, check-in with a note, versions per database (not per sheet). Versions store only the changes; the checked-in state (`head`) is kept next to the graph, outside the undo history, so undo never removes a check-in. Only data and column definitions are versioned. |
+| 2026-11-02 | Versioning is opt-in per database: it starts with the first check-in, so a new or freshly imported database shows no version and no open changes until the user decides to version it. |
 | 2026-10-20 | The meta model is derived from the types' columns, not stored separately: link columns are the relations between types, so data and model can never disagree. |
 
 ## 10. Open questions

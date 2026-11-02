@@ -649,21 +649,23 @@ export function deleteCurrentDatabase() {
 
 // --- Versions ---
 
-/** Edit → Discard changes: back to the last checked-in version (can be undone). */
+/** Versions → Discard changes: back to the last checked-in version (can be undone). */
 export function discardChanges() {
   const { graph, history, edit } = useStore.getState();
-  const n = openChanges(history.head, graph).length;
-  if (!n || !confirm(`Discard ${summarize(openChanges(history.head, graph))} since version ${history.commits.at(-1)?.no}?`)) return;
-  edit((g) => revert(g, history.head));
+  const head = history.head;
+  const n = openChanges(head, graph).length;
+  if (!head || !n || !confirm(`Discard ${summarize(openChanges(head, graph))} since version ${history.commits.at(-1)?.no}?`)) return;
+  edit((g) => revert(g, head));
 }
 
-/** Edit → Revert cell / row: the selected cell (or, on the ID, the row) gets its checked-in state back. */
+/** Versions → Revert cell / row: the selected cell (or, on the ID, the row) gets its checked-in state back. */
 export function revertSelection() {
   const s = useStore.getState();
   const m = currentSheet();
   const node = m.rows[s.sel.row - 1];
   if (!node) return;
   const key = s.sel.col === 0 ? undefined : m.columns[s.sel.col - 1]?.key;
-  if (s.sel.col !== 0 && !key) return;
-  s.edit((g) => revert(g, s.history.head, { id: node.id, key }));
+  const head = s.history.head;
+  if (!head || (s.sel.col !== 0 && !key)) return;
+  s.edit((g) => revert(g, head, { id: node.id, key }));
 }

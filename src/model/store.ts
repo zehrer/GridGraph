@@ -3,7 +3,7 @@ import { addType, emptyGraph, newId, normalize, typesOf } from "./graph";
 import { browserLocale, setLocale } from "./locale";
 import type { SelectionStat } from "./summary";
 import type { Graph } from "./types";
-import { startHistory, type History } from "./history";
+import { noHistory, type History } from "./history";
 import type { XlsxSheet } from "./xlsx";
 
 /** A database saved in this browser. */
@@ -80,7 +80,7 @@ interface State {
   edit: (fn: (g: Graph) => void) => void;
   undo: () => void;
   redo: () => void;
-  /** Switches to another database (clears undo history); `dirty` saves it right away. Without a version history one starts here. */
+  /** Switches to another database (clears undo history); `dirty` saves it right away. Without a version history it is not versioned until its first check-in. */
   open: (g: Graph, db: DbInfo, dirty?: boolean, history?: History) => void;
   rename: (name: string) => void;
   setView: (view: View, focusNodeId?: string | null) => void;
@@ -117,7 +117,7 @@ export const useStore = create<State>()((set, get) => {
     dbs: [],
     revision: 0,
     graph: initial,
-    history: startHistory(initial),
+    history: noHistory(),
     setHistory: (history) => set({ history }),
     past: [],
     future: [],
@@ -154,10 +154,9 @@ export const useStore = create<State>()((set, get) => {
     },
     open: (g, db, dirty = false, history) => {
       const graph = normalize(g);
-      // The sheet a database needs is added before the history starts, so it is not an open change.
       const activeTypeId = settle(graph, "");
       set({
-        graph, history: history ?? startHistory(graph), db, activeTypeId, past: [], future: [], view: "sheet", 
+        graph, history: history ?? noHistory(), db, activeTypeId, past: [], future: [], view: "sheet", 
         sel: { row: 1, col: 0 }, anchor: { row: 1, col: 0 }, sort: null, filter: "", hiddenTypes: [], shownTypes: [], back: null,
         savedAt: dirty ? null : new Date(db.updatedAt), revision: get().revision + (dirty ? 1 : 0),
       });

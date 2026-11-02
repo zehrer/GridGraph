@@ -4,6 +4,8 @@
  * versioned – widths, formats, filters and views are not.
  *
  * `head` is the checked-in state; the open changes are the difference between it and the graph.
+ * A database is not versioned until its first check-in: until then `head` is null and nothing
+ * counts as a change.
  */
 import { columnsOf, deleteNodes, nodeName, upsertColumn } from "./graph";
 import type { Column, Edge, Graph, GraphNode, Value } from "./types";
@@ -40,7 +42,7 @@ export interface Commit {
   changes: Change[];
 }
 
-export interface History { commits: Commit[]; head: Snapshot }
+export interface History { commits: Commit[]; head: Snapshot | null }
 
 const snapColumn = (c: Column): SnapColumn => {
   const s: SnapColumn = { key: c.key, label: c.label, type: c.type };
@@ -66,9 +68,12 @@ export function snapshot(g: Graph): Snapshot {
   return { nodes, edges: structuredClone(g.edges) };
 }
 
-/** A new history whose first version is the graph as it is. */
-export function startHistory(g: Graph): History {
-  return { commits: [{ no: 1, at: new Date().toISOString(), kind: "initial", message: "Start of history", changes: [] }], head: snapshot(g) };
+/** No versions yet: versioning starts with the first check-in. */
+export const noHistory = (): History => ({ commits: [], head: null });
+
+/** A history whose first version is the graph as it is. */
+export function startHistory(g: Graph, message = ""): History & { head: Snapshot } {
+  return { commits: [{ no: 1, at: new Date().toISOString(), kind: "initial", message: message.trim(), changes: [] }], head: snapshot(g) };
 }
 
 const same = (a: unknown, b: unknown): boolean => {
@@ -119,8 +124,10 @@ export function diff(head: Snapshot, g: Graph): Change[] {
 }
 
 const cache = new WeakMap<Graph, { head: Snapshot; changes: Change[] }>();
-/** `diff`, computed once per graph state. */
-export function openChanges(head: Snapshot, g: Graph): Change[] {
+const NONE: Change[] = [];
+/** `diff`, computed once per graph state; none while the database is not versioned. */
+export function openChanges(head: Snapshot | null, g: Graph): Change[] {
+  if (!head) return NONE;
   const c = cache.get(g);
   if (c?.head === head) return c.changes;
   const changes = diff(head, g);
@@ -128,8 +135,9 @@ export function openChanges(head: Snapshot, g: Graph): Change[] {
   return changes;
 }
 
-/** Records the open changes as the next version; returns the history unchanged when there are none. */
+/** Records the open changes as the next version (the first check-in starts the history); returns the history unchanged when there are none. */
 export function checkIn(h: History, g: Graph, message: string): History {
+  if (!h.head) return startHistory(g, message);
   const changes = diff(h.head, g);
   if (!changes.length) return h;
   const no = (h.commits.at(-1)?.no ?? 0) + 1;
@@ -198,8 +206,8 @@ export function revert(g: Graph, head: Snapshot, scope?: { id: string; key?: str
 }
 
 /** Readable lines for a version's changes, e.g. `Person "Alice" · Age: 32 → 33`. */
-export function describe(c: Change, g: Graph, head: Snapshot): string {
-  const node = (id: string): SnapNode | GraphNode | undefined => g.nodes[id] ?? head.nodes[id];
+export function describe(c: Change, g: Graph, head: Snapshot | null): string {
+  const node = (id: string): SnapNode | GraphNode | undefined => g.nodes[id] ?? head?.nodes[id];
   const typeOf = (n?: SnapNode | GraphNode) => (n?.isType ? n : n?.typeId ? node(n.typeId) : undefined);
   const name = (id: string) => {
     const n = node(id);

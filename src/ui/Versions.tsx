@@ -5,7 +5,7 @@ import { checkIn, describe, openChanges, summarize, type Commit } from "../model
 const LIST_MAX = 200;
 const when = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 
-/** File → Check in: records the open changes as the next version, with an optional note. */
+/** Versions → Check in: records the open changes as the next version, with an optional note. The first check-in starts the history. */
 export function CheckIn({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
@@ -13,15 +13,26 @@ export function CheckIn({ onClose }: { onClose: () => void }) {
   const changes = openChanges(history.head, graph);
   const [message, setMessage] = useState("");
   const next = (history.commits.at(-1)?.no ?? 0) + 1;
+  const rows = Object.values(graph.nodes).filter((n) => !n.isType).length;
+  const sheets = Object.values(graph.nodes).filter((n) => n.isType).length;
 
   return (
     <dialog ref={ref} className="dialog versions" onClose={onClose}>
       <form method="dialog" onSubmit={() => setHistory(checkIn(history, graph, message))}>
-        <h3>Check in version {next}</h3>
-        {changes.length ? (
+        <h3>{history.head ? `Check in version ${next}` : "Start versioning"}</h3>
+        {!history.head && (
+          <p className="hint">
+            The current state ({rows} row{rows === 1 ? "" : "s"} in {sheets} sheet{sheets === 1 ? "" : "s"}) becomes version 1. From then on, changes are marked until you check them in. Data is still saved automatically.
+          </p>
+        )}
+        {!history.head || changes.length ? (
           <>
-            <p className="hint">{summarize(changes)} since version {next - 1}.</p>
-            <ChangeList lines={changes.map((c) => describe(c, graph, history.head))} />
+            {history.head && (
+              <>
+                <p className="hint">{summarize(changes)} since version {next - 1}.</p>
+                <ChangeList lines={changes.map((c) => describe(c, graph, history.head))} />
+              </>
+            )}
             <label>
               <span>Note</span>
               <input className="wide" autoFocus placeholder="What changed? (optional)" value={message} onChange={(e) => setMessage(e.target.value)} />
@@ -32,14 +43,14 @@ export function CheckIn({ onClose }: { onClose: () => void }) {
         )}
         <footer>
           <button type="button" onClick={() => ref.current?.close()}>Cancel</button>
-          <button className="primary" disabled={!changes.length}>Check in</button>
+          <button className="primary" disabled={!!history.head && !changes.length}>Check in</button>
         </footer>
       </form>
     </dialog>
   );
 }
 
-/** File → History: the checked-in versions, newest first, each with its changes. */
+/** Versions → History: the checked-in versions, newest first, each with its changes. */
 export function HistoryDialog({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
@@ -73,7 +84,7 @@ function CommitItem({ commit: c }: { commit: Commit }) {
       <button type="button" className="commit" disabled={!c.changes.length} onClick={() => setOpen(!open)}>
         <b>v{c.no}</b>
         <span className="when">{when(c.at)}</span>
-        <span className="msg">{c.message || (c.kind === "initial" ? "Start of history" : "Check-in")}</span>
+        <span className="msg">{c.message || (c.kind === "initial" ? "Start of versioning" : "Check-in")}</span>
         <span className="sum">{c.kind === "initial" ? "" : summarize(c.changes)}</span>
       </button>
       {open && <ChangeList lines={c.changes.map((x) => describe(x, graph, history.head))} />}
